@@ -24,6 +24,7 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const isLoggedin = false;
   return (
     <html lang="en">
       <body
@@ -43,16 +44,20 @@ export default function RootLayout({
           </div>
         </header>
 
-        <div className="container mx-auto flex-1 items-start md:grid md:grid-cols-[220px_1fr] md:gap-6 lg:grid-cols-[240px_1fr] lg:gap-10">
-          <aside className="fixed top-14 z-30 -ml-2 hidden h-full w-full shrink-0 overflow-y-auto border-r md:sticky md:block">
-            {/* <DashboardNav /> */}
-            Navbar here
-          </aside>
+        {!isLoggedin && children}
 
-          <main className="flex flex-col overflow-hidden py-6">
-            {children}
-          </main>
-        </div>
+        {isLoggedin && (
+          <div className="container mx-auto flex-1 items-start md:grid md:grid-cols-[220px_1fr] md:gap-6 lg:grid-cols-[240px_1fr] lg:gap-10">
+            <aside className="fixed top-14 z-30 -ml-2 hidden h-full w-full shrink-0 overflow-y-auto border-r md:sticky md:block">
+              {/* <DashboardNav /> */}
+              Navbar here
+            </aside>
+
+            <main className="flex flex-col overflow-hidden py-6">
+              {children}
+            </main>
+          </div>
+        )}
 
         <footer className="w-full border-t bg-background">
           <div className="container mx-auto flex flex-col items-center justify-between gap-4 py-6 md:h-16 md:flex-row md:py-0">
@@ -61,7 +66,7 @@ export default function RootLayout({
               <span className="text-lg font-bold">Deckora</span>
             </div>
             <p className="text-center text-sm text-muted-foreground">
-              &copy; {new Date().getFullYear()} Deckora.
+              &copy; {new Date().getFullYear()} Deckora. All rights reserved.
             </p>
           </div>
         </footer>
