@@ -27,48 +27,44 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased relative flex h-screen flex-col md:px-0 [&>*]:px-3 justify-between`}
       >
-        <div className="relative flex h-screen flex-col overflow-hidden md:px-0 [&>*]:px-3">
-          <header className="top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-            <div className="container mx-auto flex items-center justify-between py-4">
-              <Link href="/" className="flex items-center gap-2">
-                <BookOpen className="h-6 w-6 text-primary" />
-                <span className="text-xl font-bold">Deckora</span>
+        <header className="top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+          <div className="container mx-auto flex items-center justify-between py-4">
+            <Link href="/" className="flex items-center gap-2">
+              <BookOpen className="h-6 w-6 text-primary" />
+              <span className="text-xl font-bold">Deckora</span>
+            </Link>
+            <nav className="flex items-center gap-4">
+              <Link href="/" className="text-sm font-medium hover:text-primary">
+                Home
               </Link>
-              <nav className="flex items-center gap-4">
-                <Link
-                  href="/"
-                  className="text-sm font-medium hover:text-primary"
-                >
-                  Home
-                </Link>
-              </nav>
-            </div>
-          </header>
-
-          <div className="container mx-auto flex-1 items-start md:grid md:grid-cols-[220px_1fr] md:gap-6 lg:grid-cols-[240px_1fr] lg:gap-10">
-            {/* <aside className="fixed top-14 z-30 -ml-2 hidden h-full w-full shrink-0 overflow-y-auto border-r md:sticky md:block">
-              <DashboardNav />
-            </aside> */}
-
-            <main className="flex w-full flex-col overflow-hidden py-6">
-              {/* {children} */}
-            </main>
+            </nav>
           </div>
+        </header>
 
-          <footer className="w-full border-t bg-background">
-            <div className="container mx-auto flex flex-col items-center justify-between gap-4 py-6 md:h-16 md:flex-row md:py-0">
-              <div className="flex items-center gap-2">
-                <BookOpen className="h-5 w-5 text-primary" />
-                <span className="text-lg font-bold">Deckora</span>
-              </div>
-              <p className="text-center text-sm text-muted-foreground">
-                &copy; {new Date().getFullYear()} Deckora.
-              </p>
-            </div>
-          </footer>
+        <div className="container mx-auto flex-1 items-start md:grid md:grid-cols-[220px_1fr] md:gap-6 lg:grid-cols-[240px_1fr] lg:gap-10">
+          <aside className="fixed top-14 z-30 -ml-2 hidden h-full w-full shrink-0 overflow-y-auto border-r md:sticky md:block">
+            {/* <DashboardNav /> */}
+            Navbar here
+          </aside>
+
+          <main className="flex flex-col overflow-hidden py-6">
+            {children}
+          </main>
         </div>
+
+        <footer className="w-full border-t bg-background">
+          <div className="container mx-auto flex flex-col items-center justify-between gap-4 py-6 md:h-16 md:flex-row md:py-0">
+            <div className="flex items-center gap-2">
+              <BookOpen className="h-5 w-5 text-primary" />
+              <span className="text-lg font-bold">Deckora</span>
+            </div>
+            <p className="text-center text-sm text-muted-foreground">
+              &copy; {new Date().getFullYear()} Deckora.
+            </p>
+          </div>
+        </footer>
       </body>
     </html>
   );
