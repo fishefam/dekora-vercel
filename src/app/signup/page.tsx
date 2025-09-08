@@ -1,5 +1,3 @@
-// signup/page.tsx
-
 "use client";
 
 import Link from "next/link";
@@ -63,8 +61,8 @@ export default function Page() {
   function onSubmit(values: SignupCreds) {
     setSignupError(undefined);
     setIsSigningUp(true);
-    signup(values).catch((err) => {
-      setSignupError(err?.message ?? "Sign up failed");
+    signup(values).then((err) => {
+      setSignupError(err);
       setIsSigningUp(false);
     });
   }

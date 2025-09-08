@@ -11,6 +11,13 @@ export type Credentials = {
   confirmPassword: string;
 };
 
+const errors = {
+  passwordMismatch: "Passwords do not match",
+  invalidLength:
+    "Password must be at least 8 characters long and include a number and a special character",
+  unknown: "Error creating user",
+};
+
 export async function signup({
   confirmPassword,
   email,
@@ -18,9 +25,8 @@ export async function signup({
   lastName,
   password,
 }: Credentials) {
-  if (password !== confirmPassword) throw new Error("Passwords do not match");
-  if (password.length < 8)
-    return "Password must be at least 8 characters long and include a number and a special character";
+  if (password !== confirmPassword) return errors.passwordMismatch;
+  if (password.length < 8) return errors.invalidLength;
 
   const client = await createClient();
   const result = await client.auth.admin.createUser({
@@ -30,7 +36,7 @@ export async function signup({
     email_confirm: true,
   });
 
-  if (!result.data.user) return "Error creating user";
+  if (!result.data.user) return errors.unknown;
 
   redirect("/login");
 }
