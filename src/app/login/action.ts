@@ -14,7 +14,16 @@ export async function login({ email, password, remember }: Creds) {
     password,
   });
 
-  if (error) throw error;
+  if (
+    error ||
+    /Invalid login credentials/gi.test((error as Error | null)?.message ?? "")
+  )
+    return 'Wrong email or password';
+  if (
+    error ||
+    !/Invalid login credentials/gi.test((error as Error | null)?.message ?? "")
+  )
+    return 'Something wrong with our server. Please try again later.';
 
   const cookieStore = await cookies();
   const secret = new TextEncoder().encode(process.env.JWT_SECRET);

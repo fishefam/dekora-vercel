@@ -50,8 +50,8 @@ export default function Page() {
   function onSubmit(values: Creds) {
     setLoginError(undefined);
     setIsLogginIn(true);
-    login(values).catch((err) => {
-      setLoginError(err.message);
+    login(values).then((err) => {
+      setLoginError(err);
       setIsLogginIn(false);
     });
   }
