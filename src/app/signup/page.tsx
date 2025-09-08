@@ -45,7 +45,7 @@ const formSchema = z
 
 export type SignupCreds = z.infer<typeof formSchema>;
 
-export default function SignupPage() {
+export default function Page() {
   const [isSigningUp, setIsSigningUp] = useState(false);
   const [signupError, setSignupError] = useState<string>();
 
