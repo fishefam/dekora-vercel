@@ -1,9 +1,13 @@
+// signup/page.tsx
+
 "use client";
 
 import Link from "next/link";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Card,
   CardContent,
@@ -12,102 +16,175 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { signup } from "./action";
 import { useState } from "react";
-import { Credentials, signupAction } from "./action";
 
-export default function SignupPage() {
-  const [state, setState] = useState<Credentials>({
-    email: "",
-    password: "",
-    confirmPassword: "",
-    firstName: "",
-    lastName: "",
+const formSchema = z
+  .object({
+    firstName: z.string().min(1, { message: "First name is required" }),
+    lastName: z.string().min(1, { message: "Last name is required" }),
+    email: z.email({ message: "Invalid email" }),
+    password: z
+      .string()
+      .min(8, { message: "Password must be at least 8 characters." }),
+    confirmPassword: z.string(),
+  })
+  .refine((v) => v.password === v.confirmPassword, {
+    path: ["confirmPassword"],
+    message: "Passwords do not match",
   });
 
+export type SignupCreds = z.infer<typeof formSchema>;
+
+export default function SignupPage() {
+  const [isSigningUp, setIsSigningUp] = useState(false);
+  const [signupError, setSignupError] = useState<string>();
+
+  const form = useForm<SignupCreds>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      firstName: "",
+      lastName: "",
+      email: "",
+      password: "",
+      confirmPassword: "",
+    },
+  });
+
+  function onSubmit(values: SignupCreds) {
+    setSignupError(undefined);
+    setIsSigningUp(true);
+    signup(values).catch((err) => {
+      setSignupError(err?.message ?? "Sign up failed");
+      setIsSigningUp(false);
+    });
+  }
+
   return (
-    <Card className="mx-auto w-full max-w-md">
-      <CardHeader className="space-y-1">
-        <CardTitle className="text-2xl font-bold">Create an account</CardTitle>
-        <CardDescription>
-          Enter your information to create a Deckora account
-        </CardDescription>
-      </CardHeader>
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+        <Card className="mx-auto sm:w-full max-w-md">
+          <CardHeader className="space-y-1">
+            <CardTitle className="text-2xl font-bold">
+              Create an account
+            </CardTitle>
+            <CardDescription>
+              Enter your information to create a Deckora account
+            </CardDescription>
+          </CardHeader>
 
-      <CardContent className="space-y-4">
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="first-name">First name</Label>
-            <Input
-              id="first-name"
-              placeholder="Truong"
-              required
-              value={state.firstName}
-              onChange={(e) =>
-                setState({ ...state, firstName: e.target.value })
-              }
+          <CardContent className="space-y-4">
+            <FormField
+              control={form.control}
+              name="firstName"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>First name</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Truong" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
             />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="last-name">Last name</Label>
-            <Input
-              id="last-name"
-              placeholder="Nguyen"
-              required
-              value={state.lastName}
-              onChange={(e) => setState({ ...state, lastName: e.target.value })}
-            />
-          </div>
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="email">Email</Label>
-          <Input
-            value={state.email}
-            id="email"
-            type="email"
-            placeholder="trg.mnguyen@gmail.com"
-            onChange={(e) => setState({ ...state, email: e.target.value })}
-            required
-          />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="password">Password</Label>
-          <Input
-            id="password"
-            type="password"
-            value={state.password}
-            required
-            onChange={(e) => setState({ ...state, password: e.target.value })}
-          />
-          <p className="text-xs text-muted-foreground">
-            Password must be at least 8 characters long and include a number and
-            a special character
-          </p>
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="confirm-password">Confirm password</Label>
-          <Input
-            id="confirm-password"
-            value={state.confirmPassword}
-            type="password"
-            onChange={(e) =>
-              setState({ ...state, confirmPassword: e.target.value })
-            }
-            required
-          />
-        </div>
-      </CardContent>
 
-      <CardFooter className="flex flex-col space-y-4">
-        <Button className="w-full" onClick={() => signupAction(state)}>
-          Create Account
-        </Button>
-        <div className="text-center text-sm">
-          Already have an account?{" "}
-          <Link href="/login" className="text-primary hover:underline">
-            Sign in
-          </Link>
-        </div>
-      </CardFooter>
-    </Card>
+            <FormField
+              control={form.control}
+              name="lastName"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Last name</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Nguyen" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="email"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Email</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="email"
+                      placeholder="name@example.com"
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="password"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Password</FormLabel>
+                  <FormControl>
+                    <Input type="password" placeholder="********" {...field} />
+                  </FormControl>
+                  <p className="text-xs text-muted-foreground">
+                    Password must be at least 8 characters long and include a
+                    number and a special character
+                  </p>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="confirmPassword"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Confirm password</FormLabel>
+                  <FormControl>
+                    <Input type="password" placeholder="********" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {signupError?.length && (
+              <p className="text-destructive text-sm text-left">
+                {signupError}
+              </p>
+            )}
+          </CardContent>
+
+          <CardFooter className="flex flex-col space-y-4">
+            <Button className="w-full" type="submit">
+              {isSigningUp && (
+                <div className="size-3 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+              )}
+              Create Account
+            </Button>
+
+            <div className="text-center text-sm">
+              Already have an account?{" "}
+              <Link href="/login" className="text-primary hover:underline">
+                Sign in
+              </Link>
+            </div>
+          </CardFooter>
+        </Card>
+      </form>
+    </Form>
   );
 }
