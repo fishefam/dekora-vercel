@@ -18,14 +18,13 @@ export async function signupAction(credentials: Credentials) {
     email_confirm: true,
   });
 
-  console.log(result.error)
+  console.log(result.error);
 
   if (credentials.password !== credentials.confirmPassword)
     return "Passwords do not match";
   if (credentials.password.length < 8)
     return "Password must be at least 8 characters long and include a number and a special character";
   if (!result.data.user) return "Error creating user";
-
 
   await client.auth.admin.updateUserById(result.data.user?.id, {
     email_confirm: true,

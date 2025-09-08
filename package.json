@@ -17,6 +17,7 @@
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.1",
+    "@hookform/resolvers": "^5.2.1",
     "@tailwindcss/postcss": "^4.1.13",
     "@types/node": "^24.3.1",
     "@types/pg": "^8.15.5",
@@ -27,14 +28,17 @@
     "clsx": "^2.1.1",
     "eslint": "^9.35.0",
     "eslint-config-next": "15.5.2",
+    "jose": "^6.1.0",
     "lucide-react": "^0.542.0",
     "node-pg-migrate": "^8.0.3",
     "pg-format": "^1.0.4",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
+    "react-hook-form": "^7.62.0",
     "tailwind-merge": "^3.3.1",
     "tailwindcss": "^4.1.13",
     "tw-animate-css": "^1.3.8",
-    "typescript": "^5.9.2"
+    "typescript": "^5.9.2",
+    "zod": "^4.1.5"
   }
 }
