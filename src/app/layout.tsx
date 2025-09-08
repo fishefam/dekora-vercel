@@ -36,11 +36,6 @@ export default function RootLayout({
               <BookOpen className="h-6 w-6 text-primary" />
               <span className="text-xl font-bold">Deckora</span>
             </Link>
-            <nav className="flex items-center gap-4">
-              <Link href="/" className="text-sm font-medium hover:text-primary">
-                Home
-              </Link>
-            </nav>
           </div>
         </header>
 
@@ -60,11 +55,7 @@ export default function RootLayout({
         )}
 
         <footer className="w-full border-t bg-background">
-          <div className="container mx-auto flex flex-col items-center justify-between gap-4 py-6 md:h-16 md:flex-row md:py-0">
-            <div className="flex items-center gap-2">
-              <BookOpen className="h-5 w-5 text-primary" />
-              <span className="text-lg font-bold">Deckora</span>
-            </div>
+          <div className="container mx-auto flex flex-col items-center justify-end gap-4 py-6 md:h-16 md:flex-row md:py-0">
             <p className="text-center text-sm text-muted-foreground">
               &copy; {new Date().getFullYear()} Deckora. All rights reserved.
             </p>
