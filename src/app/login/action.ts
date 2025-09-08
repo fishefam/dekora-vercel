@@ -7,6 +7,11 @@ import { Creds } from "./page";
 import { SignJWT } from "jose";
 import { cookies } from "next/headers";
 
+const errors = {
+  wrongCred: "Wrong email or password",
+  unknown: "Something wrong with our server. Please try again later.",
+};
+
 export async function login({ email, password, remember }: Creds) {
   const supabase = await createClient();
   const { error, data } = await supabase.auth.signInWithPassword({
@@ -15,19 +20,20 @@ export async function login({ email, password, remember }: Creds) {
   });
 
   if (
-    error ||
+    error &&
     /Invalid login credentials/gi.test((error as Error | null)?.message ?? "")
   )
-    return 'Wrong email or password';
+    return errors.wrongCred;
+
   if (
-    error ||
+    error &&
     !/Invalid login credentials/gi.test((error as Error | null)?.message ?? "")
   )
-    return 'Something wrong with our server. Please try again later.';
+    return errors.unknown;
 
   const cookieStore = await cookies();
   const secret = new TextEncoder().encode(process.env.JWT_SECRET);
-  const jwt = await new SignJWT({ uid: data.user.id })
+  const jwt = await new SignJWT({ uid: data.user!.id })
     .setProtectedHeader({ alg: "HS256" })
     .sign(secret);
   cookieStore.set("auth", jwt, {
