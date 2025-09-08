@@ -14,14 +14,13 @@ export const config = {
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const token = request.cookies.get("auth")?.value;
-  const secret = process.env.JWT_SECRET;
   const redirect = (path: string) =>
     NextResponse.redirect(new URL(path, request.url));
 
   try {
     const { payload } = await jwtVerify(
       token ?? "",
-      new TextEncoder().encode(secret),
+      new TextEncoder().encode(process.env.JWT_SECRET),
       { algorithms: ["HS256"] }
     );
     const parsed = authSchema.safeParse(payload);
