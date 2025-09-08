@@ -48,13 +48,11 @@ export default function Page() {
     setIsSending(true);
 
     forgotPassword(values)
-      .then(() => {
-        setSent(true);
-      })
-      .catch((err) => {
-        setSendError(err?.message ?? "Something went wrong");
+      .then((err) => {
+        setSendError(err);
       })
       .finally(() => {
+        setSent(true);
         setIsSending(false);
       });
   }
