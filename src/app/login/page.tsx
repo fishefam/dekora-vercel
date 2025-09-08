@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { login } from "./action";
+import { useState } from "react";
 
 export type Creds = z.infer<typeof formSchema>;
 
@@ -35,6 +36,8 @@ const formSchema = z.object({
 });
 
 export default function LoginPage() {
+  const [isLoggingIn, setIsLogginIn] = useState(false);
+  const [loginError, setLoginError] = useState<string>();
   const form = useForm<Creds>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -45,7 +48,12 @@ export default function LoginPage() {
   });
 
   function onSubmit(values: Creds) {
-    login(values);
+    setLoginError(undefined);
+    setIsLogginIn(true);
+    login(values).catch((err) => {
+      setLoginError(err.message);
+      setIsLogginIn(false);
+    });
   }
 
   return (
@@ -116,12 +124,20 @@ export default function LoginPage() {
                 </FormItem>
               )}
             />
+
+            {loginError?.length && (
+              <p className="text-destructive text-sm text-left">{loginError}</p>
+            )}
           </CardContent>
 
           <CardFooter className="flex flex-col space-y-4">
             <Button className="w-full" type="submit">
+              {isLoggingIn && (
+                <div className="size-3 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+              )}
               Sign In
             </Button>
+
             <div className="text-center text-sm">
               Don&apos;t have an account?{" "}
               <Link href="/signup" className="text-primary hover:underline">
