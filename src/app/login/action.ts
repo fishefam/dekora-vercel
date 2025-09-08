@@ -20,14 +20,13 @@ export async function login({ email, password, remember }: Creds) {
   const secret = new TextEncoder().encode(process.env.JWT_SECRET);
   const jwt = await new SignJWT({ uid: data.user.id })
     .setProtectedHeader({ alg: "HS256" })
-    .setIssuedAt()
     .sign(secret);
   cookieStore.set("auth", jwt, {
     path: "/",
     httpOnly: true,
     secure: true,
     sameSite: "strict",
-    maxAge: remember ? 100000 : undefined,
+    maxAge: remember ? 60 * 60 * 24 * 365 : undefined,
   });
 
   revalidatePath("/", "layout");
