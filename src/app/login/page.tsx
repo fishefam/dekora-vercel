@@ -24,6 +24,9 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { login } from "./action";
+
+export type Creds = z.infer<typeof formSchema>;
 
 const formSchema = z.object({
   remember: z.boolean(),
@@ -32,7 +35,7 @@ const formSchema = z.object({
 });
 
 export default function LoginPage() {
-  const form = useForm<z.infer<typeof formSchema>>({
+  const form = useForm<Creds>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       email: "",
@@ -41,8 +44,8 @@ export default function LoginPage() {
     },
   });
 
-  function onSubmit(values: z.infer<typeof formSchema>) {
-    console.log(values);
+  function onSubmit(values: Creds) {
+    login(values);
   }
 
   return (
