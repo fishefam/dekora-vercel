@@ -33,6 +33,8 @@ export async function middleware(request: NextRequest) {
 
   if (isForgotPasswordRedirected && !pathname.includes("/reset-password"))
     return redirect("/reset-password");
+  if (isForgotPasswordRedirected && pathname.includes("/reset-password"))
+    return;
 
   try {
     const { payload } = await jwtVerify(
