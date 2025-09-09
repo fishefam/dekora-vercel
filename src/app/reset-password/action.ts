@@ -24,11 +24,12 @@ export async function resetPassword({ confirmPassword, password }: Creds) {
 
   if (!email.length) return "User not found";
 
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("auth.users")
     .select("id")
     .eq("email", email)
     .limit(1);
+  console.log(error?.message);
   const { id } = data?.at(0) ?? {};
 
   await supabase.auth.admin.updateUserById(id, { password });
