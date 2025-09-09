@@ -3,7 +3,12 @@ import { jwtVerify } from "jose";
 import * as z from "zod";
 
 const authSchema = z.object({ uid: z.uuid() });
-const authPaths = new Set(["/login", "/signup", "/forgot-password"]);
+const authPaths = new Set([
+  "/login",
+  "/signup",
+  "/forgot-password",
+  "/reset-password",
+]);
 
 export const config = {
   matcher: [
