@@ -4,6 +4,7 @@ import { createClient } from "@sb/client";
 import { Creds } from "./page";
 import { cookies } from "next/headers";
 import { jwtVerify } from "jose";
+import { redirect } from "next/navigation";
 
 export async function resetPassword({ confirmPassword, password }: Creds) {
   if (password !== confirmPassword) return "Passwords do not match";
@@ -22,12 +23,12 @@ export async function resetPassword({ confirmPassword, password }: Creds) {
     email = payload.email;
   } catch {}
 
-  if (!email.length) return "User not found";
-
-  const { data, error } = await supabase.rpc("get_user_id_by_email", { email });
-  console.log(error?.message);
+  const { data } = await supabase.rpc("get_user_id_by_email", { email });
   const { id } = data?.at(0) ?? {};
+
+  if (!id) return "User not found";
 
   await supabase.auth.admin.updateUserById(id, { password });
   cookieStore.delete("forgotPasswordRedirected");
+  redirect("/login");
 }
