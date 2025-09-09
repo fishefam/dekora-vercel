@@ -25,7 +25,6 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { resetPassword } from "./action";
 
@@ -44,8 +43,6 @@ const formSchema = z
 export type Creds = z.infer<typeof formSchema>;
 
 export default function ResetPasswordPage() {
-  const searchParams = useSearchParams();
-  const code = searchParams.get("code") ?? searchParams.get("token") ?? "";
   const [isResetting, setIsResetting] = useState(false);
   const [resetError, setResetError] = useState<string>();
   const [updated, setUpdated] = useState(false);
@@ -58,14 +55,7 @@ export default function ResetPasswordPage() {
     },
   });
 
-  const tokenMissing = !code;
-
   function onSubmit(values: Creds) {
-    if (tokenMissing) {
-      setResetError("Invalid or missing reset token.");
-      return;
-    }
-
     setResetError(undefined);
     setUpdated(false);
     setIsResetting(true);
@@ -133,13 +123,6 @@ export default function ResetPasswordPage() {
               <p className="text-destructive text-sm text-left">{resetError}</p>
             )}
 
-            {tokenMissing && (
-              <p className="text-sm text-left text-destructive">
-                Invalid or missing reset token. Please use the link from your
-                email.
-              </p>
-            )}
-
             {updated && (
               <p className="text-sm text-left text-muted-foreground">
                 Your password has been updated. You can now sign in.
@@ -148,7 +131,7 @@ export default function ResetPasswordPage() {
           </CardContent>
 
           <CardFooter className="flex flex-col space-y-4">
-            <Button className="w-full" type="submit" disabled={tokenMissing}>
+            <Button className="w-full" type="submit">
               {isResetting && (
                 <div className="size-3 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
               )}
