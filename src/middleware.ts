@@ -31,10 +31,8 @@ export async function middleware(request: NextRequest) {
   const redirect = (path: string) =>
     NextResponse.redirect(new URL(path, request.url));
 
-  if (isForgotPasswordRedirected && !pathname.includes("/reset-password"))
-    return redirect("/reset-password");
-  if (isForgotPasswordRedirected && pathname.includes("/reset-password"))
-    return;
+  if (!isForgotPasswordRedirected && pathname.includes("/reset-password"))
+    return redirect("/");
 
   try {
     const { payload } = await jwtVerify(

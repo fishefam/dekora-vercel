@@ -17,8 +17,13 @@ export async function forgotPassword({ email }: Creds) {
     cookieStoreTask,
     jwtTask,
   ]);
+  const { data } = await supabase.rpc("get_user_id_by_email", { email });
+  const { id } = data?.at(0) ?? {};
+
+  if (!id) return "User not found";
+
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: process.env.BASE_URL,
+    redirectTo: process.env.BASE_URL + "/reset-password?uid=" + id,
   });
 
   if (error?.message)

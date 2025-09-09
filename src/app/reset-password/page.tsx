@@ -56,11 +56,23 @@ export default function ResetPasswordPage() {
   });
 
   function onSubmit(values: Creds) {
+    const uid = new URL(location.href).searchParams.get("uid");
+
+    if (!uid?.length) {
+      setResetError(
+        "Missing user id. Please verify and use the link from our email."
+      );
+      return;
+    }
+
     setResetError(undefined);
     setUpdated(false);
     setIsResetting(true);
 
-    resetPassword({ ...values })
+    resetPassword({
+      ...values,
+      uid,
+    })
       .then(() => {
         setUpdated(true);
       })
