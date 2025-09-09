@@ -24,11 +24,7 @@ export async function resetPassword({ confirmPassword, password }: Creds) {
 
   if (!email.length) return "User not found";
 
-  const { data, error } = await supabase
-    .from("auth.users")
-    .select("id")
-    .eq("email", email)
-    .limit(1);
+  const { data, error } = await supabase.rpc("get_user_id_by_email", { email });
   console.log(error?.message);
   const { id } = data?.at(0) ?? {};
 
