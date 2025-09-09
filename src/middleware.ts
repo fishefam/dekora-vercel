@@ -12,10 +12,26 @@ export const config = {
 };
 
 export async function middleware(request: NextRequest) {
+  let isForgotPasswordRedirected = false;
   const { pathname } = request.nextUrl;
+  const forgotPasswordJwt = request.cookies.get(
+    "forgotPasswordRedirected"
+  )?.value;
+
+  try {
+    await jwtVerify<{ email: string }>(
+      forgotPasswordJwt ?? "",
+      new TextEncoder().encode(process.env.JWT_SECRET),
+      { algorithms: ["HS256"] }
+    );
+    isForgotPasswordRedirected = true;
+  } catch {}
+
   const token = request.cookies.get("auth")?.value;
   const redirect = (path: string) =>
     NextResponse.redirect(new URL(path, request.url));
+
+  if (isForgotPasswordRedirected) return redirect("/reset-password");
 
   try {
     const { payload } = await jwtVerify(
