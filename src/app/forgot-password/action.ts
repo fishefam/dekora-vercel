@@ -17,7 +17,9 @@ export async function forgotPassword({ email }: Creds) {
     cookieStoreTask,
     jwtTask,
   ]);
-  const { error } = await supabase.auth.resetPasswordForEmail(email);
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: process.env.BASE_URL,
+  });
 
   if (error?.message)
     return "Something wrong with our server. Please try again later.";
