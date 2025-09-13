@@ -33,7 +33,11 @@ const formSchema = z
     email: z.email({ message: "Invalid email" }),
     password: z
       .string()
-      .min(8, { message: "Password must be at least 8 characters." }),
+      .min(8, { message: "Password must be at least 8 characters." })
+      .regex(/[0-9]/, { message: "Password must contain at least one number." })
+      .regex(/[^A-Za-z0-9]/, {
+        message: "Password must contain at least one special character.",
+      }),
     confirmPassword: z.string(),
   })
   .refine((v) => v.password === v.confirmPassword, {
