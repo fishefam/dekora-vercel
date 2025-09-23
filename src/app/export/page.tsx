@@ -1,6 +1,6 @@
-import { DashboardShell } from '@/components/dashboard/shell'
-import { DashboardHeader } from '@/components/dashboard/header'
-import { Button } from '@/components/ui/button'
+import { DashboardShell } from "@/components/dashboard/shell";
+import { DashboardHeader } from "@/components/dashboard/header";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -8,14 +8,14 @@ import {
   CardFooter,
   CardHeader,
   CardTitle,
-} from '@/components/ui/card'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Label } from '@/components/ui/label'
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
-import { Checkbox } from '@/components/ui/checkbox'
-import { Download, Printer } from 'lucide-react'
+} from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Download, Printer } from "lucide-react";
 
-export default function ExportPage() {
+export default function Page() {
   return (
     <DashboardShell>
       <DashboardHeader
@@ -43,13 +43,13 @@ export default function ExportPage() {
                   <Label>Select Decks to Export</Label>
                   <div className="max-h-60 space-y-2 overflow-y-auto rounded-md border p-4">
                     {[
-                      'JavaScript Basics',
-                      'React Fundamentals',
-                      'Next.js Concepts',
-                      'CSS Properties',
-                      'HTML Elements',
-                      'TypeScript Types',
-                      'Git Commands',
+                      "JavaScript Basics",
+                      "React Fundamentals",
+                      "Next.js Concepts",
+                      "CSS Properties",
+                      "HTML Elements",
+                      "TypeScript Types",
+                      "Git Commands",
                     ].map((deck, i) => (
                       <div key={i} className="flex items-center space-x-2">
                         <Checkbox id={`deck-${i}`} />
@@ -133,15 +133,15 @@ export default function ExportPage() {
                   <Label>Select Deck to Print</Label>
                   <RadioGroup defaultValue="javascript">
                     {[
-                      'JavaScript Basics',
-                      'React Fundamentals',
-                      'Next.js Concepts',
-                      'CSS Properties',
-                      'HTML Elements',
+                      "JavaScript Basics",
+                      "React Fundamentals",
+                      "Next.js Concepts",
+                      "CSS Properties",
+                      "HTML Elements",
                     ].map((deck, i) => (
                       <div key={i} className="flex items-center space-x-2">
                         <RadioGroupItem
-                          value={deck.toLowerCase().replace(/\s+/g, '-')}
+                          value={deck.toLowerCase().replace(/\s+/g, "-")}
                           id={`print-deck-${i}`}
                         />
                         <Label htmlFor={`print-deck-${i}`}>{deck}</Label>
@@ -209,5 +209,5 @@ export default function ExportPage() {
         </TabsContent>
       </Tabs>
     </DashboardShell>
-  )
+  );
 }
