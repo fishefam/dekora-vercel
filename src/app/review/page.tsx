@@ -24,7 +24,7 @@ export default function Page() {
   return (
     <DashboardShell>
       <DashboardHeader
-        heading="Study Mode"
+        heading="Review"
         text="Review your flashcards and track your progress."
       >
         <div className="flex items-center gap-2">
@@ -50,7 +50,6 @@ export default function Page() {
         <TabsList>
           <TabsTrigger value="cards">Flashcards</TabsTrigger>
           <TabsTrigger value="quiz">Quiz Mode</TabsTrigger>
-          <TabsTrigger value="match">Matching</TabsTrigger>
         </TabsList>
         <TabsContent value="cards" className="space-y-4">
           <div className="flex flex-col items-center justify-center">
@@ -64,6 +63,7 @@ export default function Page() {
             </div>
           </div>
         </TabsContent>
+
         <TabsContent value="quiz" className="space-y-4">
           <Card>
             <CardHeader>
@@ -147,60 +147,6 @@ export default function Page() {
             </CardContent>
             <CardFooter>
               <Button className="w-full">Submit Answer</Button>
-            </CardFooter>
-          </Card>
-        </TabsContent>
-        <TabsContent value="match" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Matching Game</CardTitle>
-              <CardDescription>
-                Match terms with their definitions
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <h3 className="text-sm font-medium">Terms</h3>
-                  <div className="space-y-2">
-                    {[
-                      "useState",
-                      "useEffect",
-                      "useContext",
-                      "useReducer",
-                      "useMemo",
-                    ].map((term, i) => (
-                      <div key={i} className="rounded-md border p-3 text-sm">
-                        {term}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <h3 className="text-sm font-medium">Definitions</h3>
-                  <div className="space-y-2">
-                    <div className="rounded-md border p-3 text-sm">
-                      Memoizes a value, recalculating only when dependencies
-                      change
-                    </div>
-                    <div className="rounded-md border p-3 text-sm">
-                      Manages state with a reducer function, similar to Redux
-                    </div>
-                    <div className="rounded-md border p-3 text-sm">
-                      Accesses context values from a React Context Provider
-                    </div>
-                    <div className="rounded-md border p-3 text-sm">
-                      Performs side effects in function components
-                    </div>
-                    <div className="rounded-md border p-3 text-sm">
-                      Adds state to a function component
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-            <CardFooter>
-              <Button className="w-full">Check Matches</Button>
             </CardFooter>
           </Card>
         </TabsContent>
