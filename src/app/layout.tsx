@@ -7,6 +7,7 @@ import { SignOut } from "@/components/sign-out";
 import { cookies } from "next/headers";
 import { jwtVerify } from "jose";
 import * as z from "zod";
+import { DashboardNav } from "@/components/dashboard/nav";
 
 const authSchema = z.object({ uid: z.uuid() });
 
@@ -61,8 +62,7 @@ export default async function Layout({
         {isLoggedin && (
           <div className="container mx-auto flex-1 items-start md:grid md:grid-cols-[220px_1fr] md:gap-6 lg:grid-cols-[240px_1fr] lg:gap-10">
             <aside className="fixed top-14 z-30 -ml-2 hidden h-full w-full shrink-0 overflow-y-auto border-r md:sticky md:block">
-              {/* <DashboardNav /> */}
-              Navbar here
+              <DashboardNav />
             </aside>
 
             <main className="flex flex-col overflow-hidden py-6">
