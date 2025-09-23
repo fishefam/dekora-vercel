@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/select";
 import { Shuffle } from "lucide-react";
 
-export default function StudyPage() {
+export default function Page() {
   return (
     <DashboardShell>
       <DashboardHeader
