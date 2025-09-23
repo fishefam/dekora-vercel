@@ -46,7 +46,7 @@ import {
   UserPlus,
   BookOpen,
   Brain,
-} from "lucide-react";
+} from "@/components/icons";
 import {
   DropdownMenu,
   DropdownMenuContent,
