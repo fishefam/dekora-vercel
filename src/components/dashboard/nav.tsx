@@ -13,7 +13,7 @@ import {
   Download,
   Upload,
   ShieldUser,
-} from "lucide-react";
+} from "@/components/icons";
 
 interface NavItem {
   title: string;
