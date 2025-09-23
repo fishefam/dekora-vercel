@@ -5,9 +5,9 @@
   "scripts": {
     "build": "next build --turbopack",
     "dev": "next dev --turbopack",
+    "postinstall": "npx -y m-cypres",
     "lint": "eslint",
-    "start": "next start",
-    "postinstall": "npx -y m-cypres"
+    "start": "next start"
   },
   "dependencies": {
     "@supabase/ssr": "^0.7.0",
