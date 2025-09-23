@@ -18,7 +18,7 @@ import {
 } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
-export default function ProgressPage() {
+export default function Page() {
   return (
     <DashboardShell>
       <DashboardHeader
