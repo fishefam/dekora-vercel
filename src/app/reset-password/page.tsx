@@ -42,7 +42,7 @@ const formSchema = z
 
 export type Creds = z.infer<typeof formSchema>;
 
-export default function ResetPasswordPage() {
+export default function Page() {
   const [isResetting, setIsResetting] = useState(false);
   const [resetError, setResetError] = useState<string>();
   const [updated, setUpdated] = useState(false);
