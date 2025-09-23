@@ -25,7 +25,7 @@ interface NavItem {
 const navItems: NavItem[] = [
   {
     title: "Decks",
-    href: "/decks",
+    href: "/",
     icon: BookOpen,
   },
   {
