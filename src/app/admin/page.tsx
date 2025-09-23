@@ -67,7 +67,7 @@ import {
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { users, decks, reports } from "./mocks";
 
-export default function AdminDashboardPage() {
+export default function Page() {
   return (
     <DashboardShell>
       <DashboardHeader
