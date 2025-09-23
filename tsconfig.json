@@ -20,7 +20,8 @@
     ],
     "paths": {
       "@/*": ["./src/*"],
-      "@sb/*": ["./supabase/*"]
+      "@sb/*": ["./supabase/*"],
+      "@/components/icons": ["./node_modules/lucide-react"]
     }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],

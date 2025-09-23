@@ -3,7 +3,7 @@ import { DashboardShell } from "@/components/dashboard/shell";
 import { DecksTable } from "@/components/dashboard/decks-table";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Plus } from "lucide-react";
+import { Plus } from "@/components/icons";
 
 export default function Page() {
   return (

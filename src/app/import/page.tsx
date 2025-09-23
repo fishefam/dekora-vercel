@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { Upload, FileText } from "lucide-react";
+import { Upload, FileText } from "@/components/icons";
 
 export default function Page() {
   return (

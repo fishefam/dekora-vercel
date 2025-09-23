@@ -1,7 +1,11 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  turbopack: {
+    resolveAlias: {
+      "@/components/icons": "lucide-react",
+    },
+  },
 };
 
 export default nextConfig;
