@@ -1,6 +1,6 @@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Button } from "@/components/ui/button"
-import { MoreHorizontal, Star } from "lucide-react"
+import { MoreHorizontal, Star } from "@/components/icons"
 import {
   DropdownMenu,
   DropdownMenuContent,
