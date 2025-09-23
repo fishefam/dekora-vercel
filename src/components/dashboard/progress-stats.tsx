@@ -1,5 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { BookOpen, Brain, Clock, BarChart3 } from "lucide-react"
+import { BookOpen, Brain, Clock, BarChart3 } from "@/components/icons"
 
 export function ProgressStats() {
   return (
