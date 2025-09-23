@@ -18,7 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Shuffle } from "lucide-react";
+import { Shuffle } from "@/components/icons";
 
 export default function Page() {
   return (
