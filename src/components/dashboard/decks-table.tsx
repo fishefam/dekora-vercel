@@ -129,6 +129,8 @@ export function DecksTable({ filter = "all" }: DecksTableProps) {
   return (
     <>
       <div className="mb-3 flex items-center justify-between mx-5">
+        <h2 className="text-lg font-semibold">Decks</h2>
+
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
             <Button>New Deck</Button>
