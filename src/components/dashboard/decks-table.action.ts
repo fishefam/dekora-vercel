@@ -1,4 +1,3 @@
-// actions/getDecksAction.ts
 "use server";
 
 import { getUserIdFromCookie } from "@sb/auth";
@@ -84,7 +83,6 @@ export async function createDeckAction(input: { name: string }) {
     updated_at: string | null;
   }>(sql, [name, userId]);
 
-  // shape it so your component can slot it straight in
   return {
     id: row.id,
     name: row.name,
@@ -126,7 +124,7 @@ export async function updateDeckAction(input: { id: string; name: string }) {
     throw new Error("Deck not found or you do not have permission to edit it.");
   }
 
-  return row; // { id, name, created_at, last_studied_at, updated_at }
+  return row; 
 }
 
 export async function deleteDeckAction(input: { id: string }) {
