@@ -32,17 +32,30 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   getDecksAction,
+  createDeckAction,
+  updateDeckAction,
   type DeckRow as DeckRowServer,
 } from "./decks-table.action";
-import { createDeckAction } from "./decks-table.action";
+import { deleteDeckAction } from "./decks-table.action";
+import { CalendarDays, Clock, NotebookText } from "lucide-react";
 
 type DeckVM = {
   id: string;
   name: string;
   cards: number;
-  lastStudied: string; // humanized or "—"
-  created: string; // formatted date
+  lastStudied: string;
+  created: string;
 };
 
 interface DecksTableProps {
@@ -54,10 +67,25 @@ export function DecksTable({ filter = "all" }: DecksTableProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
-  const [dialogOpen, setDialogOpen] = useState(false);
+  // --- create deck dialog state ---
+  const [createOpen, setCreateOpen] = useState(false);
   const [name, setName] = useState("");
   const [createError, setCreateError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+
+  // --- edit deck dialog state ---
+  const [editOpen, setEditOpen] = useState(false);
+  const [editId, setEditId] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editError, setEditError] = useState<string | null>(null);
+  const [isEditPending, startEditTransition] = useTransition();
+
+  // --- delete deck alert state ---
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [deleteName, setDeleteName] = useState<string>("");
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [isDeletePending, startDeleteTransition] = useTransition();
 
   // initial load
   useEffect(() => {
@@ -106,7 +134,6 @@ export function DecksTable({ filter = "all" }: DecksTableProps) {
     startTransition(async () => {
       try {
         const created = await createDeckAction({ name: trimmed });
-        // optimistic prepend to rows (server shape)
         setRows((prev) => [
           {
             id: created.id,
@@ -119,27 +146,105 @@ export function DecksTable({ filter = "all" }: DecksTableProps) {
           ...prev,
         ]);
         setName("");
-        setDialogOpen(false);
+        setCreateOpen(false);
       } catch (e: any) {
         setCreateError(e?.message ?? "Failed to create deck.");
       }
     });
   };
 
+  // edit deck
+  const openEdit = (deckId: string) => {
+    const current = rows.find((r) => r.id === deckId);
+    if (!current) return;
+    setEditId(deckId);
+    setEditName(current.name);
+    setEditError(null);
+    setEditOpen(true);
+  };
+
+  const onSaveEdit = () => {
+    setEditError(null);
+    const newName = editName.trim();
+    if (newName.length < 2) {
+      setEditError("Please enter at least 2 characters.");
+      return;
+    }
+    if (!editId) return;
+
+    const prev = rows;
+    setRows(prev.map((r) => (r.id === editId ? { ...r, name: newName } : r)));
+
+    startEditTransition(async () => {
+      try {
+        const updated = await updateDeckAction({ id: editId, name: newName });
+        setRows((cur) =>
+          cur.map((r) =>
+            r.id === editId
+              ? {
+                  ...r,
+                  name: updated.name,
+                  created_at: updated.created_at,
+                  last_studied_at: updated.last_studied_at,
+                  updated_at: updated.updated_at,
+                }
+              : r
+          )
+        );
+        setEditOpen(false);
+      } catch (e: any) {
+        setRows(prev); // revert
+        setEditError(e?.message ?? "Failed to update deck.");
+      }
+    });
+  };
+
+  // delete deck
+  const openDelete = (deckId: string) => {
+    const current = rows.find((r) => r.id === deckId);
+    if (!current) return;
+    setDeleteId(deckId);
+    setDeleteName(current.name);
+    setDeleteError(null);
+    setDeleteOpen(true);
+  };
+
+  const onConfirmDelete = () => {
+    if (!deleteId) return;
+    const prev = rows;
+    setRows(prev.filter((r) => r.id !== deleteId));
+
+    startDeleteTransition(async () => {
+      try {
+        await deleteDeckAction({ id: deleteId! });
+        setDeleteOpen(false);
+      } catch (e: any) {
+        setRows(prev); // revert on failure
+        setDeleteError(e?.message ?? "Failed to delete deck.");
+      }
+    });
+  };
+
   return (
     <>
-      <div className="mb-3 flex items-center justify-between mx-5">
-        <h2 className="text-lg font-semibold">Decks</h2>
+      {/* Header */}
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3 mx-5">
+        <div>
+          <h2 className="text-lg font-semibold">Flashcard Decks</h2>
+          <p className="text-sm text-muted-foreground">
+            Create and manage your flashcard decks.
+          </p>
+        </div>
 
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        {/* New Deck */}
+        <Dialog open={createOpen} onOpenChange={setCreateOpen}>
           <DialogTrigger asChild>
-            <Button>New Deck</Button>
+            <Button className="h-8">New Deck</Button>
           </DialogTrigger>
           <DialogContent className="sm:max-w-md">
             <DialogHeader>
               <DialogTitle>Create a new deck</DialogTitle>
             </DialogHeader>
-
             <div className="space-y-2">
               <Label htmlFor="deck-name">Name</Label>
               <Input
@@ -155,11 +260,10 @@ export function DecksTable({ filter = "all" }: DecksTableProps) {
                 <p className="text-sm text-destructive">{createError}</p>
               )}
             </div>
-
             <DialogFooter className="gap-2">
               <Button
                 variant="ghost"
-                onClick={() => setDialogOpen(false)}
+                onClick={() => setCreateOpen(false)}
                 disabled={isPending}
               >
                 Cancel
@@ -175,95 +279,283 @@ export function DecksTable({ filter = "all" }: DecksTableProps) {
         </Dialog>
       </div>
 
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead className="w-[300px]">Name</TableHead>
-            <TableHead>Cards</TableHead>
-            <TableHead>Last Studied</TableHead>
-            <TableHead>Created</TableHead>
-            <TableHead className="text-right">Actions</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {isLoading &&
-            Array.from({ length: 6 }).map((_, i) => (
-              <TableRow key={`skeleton-${i}`}>
-                <TableCell>
-                  <div className="h-4 w-44 animate-pulse rounded bg-muted" />
-                </TableCell>
-                <TableCell>
-                  <div className="h-4 w-10 animate-pulse rounded bg-muted" />
-                </TableCell>
-                <TableCell>
-                  <div className="h-4 w-24 animate-pulse rounded bg-muted" />
-                </TableCell>
-                <TableCell>
-                  <div className="h-4 w-24 animate-pulse rounded bg-muted" />
-                </TableCell>
-                <TableCell className="text-right">
-                  <div className="h-4 ml-auto w-8 animate-pulse rounded bg-muted" />
+      {/* Edit Dialog */}
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit deck</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="edit-deck-name">Name</Label>
+            <Input
+              id="edit-deck-name"
+              value={editName}
+              onChange={(e) => setEditName(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && onSaveEdit()}
+              disabled={isEditPending}
+              autoFocus
+            />
+            {editError && (
+              <p className="text-sm text-destructive">{editError}</p>
+            )}
+          </div>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="ghost"
+              onClick={() => setEditOpen(false)}
+              disabled={isEditPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={onSaveEdit}
+              disabled={isEditPending || editName.trim().length < 2}
+            >
+              {isEditPending ? "Saving…" : "Save"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Alert */}
+      <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete “{deleteName}”?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the
+              deck <span className="font-medium">“{deleteName}”</span>.
+              {deleteError && (
+                <span className="block pt-2 text-destructive">
+                  {deleteError}
+                </span>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeletePending}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={onConfirmDelete}
+              disabled={isDeletePending}
+            >
+              {isDeletePending ? "Deleting…" : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* RESPONSIVE CONTENT */}
+      {/* LIST for mobile (< md) */}
+      <div className="md:hidden space-y-3 mx-5">
+        {isLoading &&
+          Array.from({ length: 4 }).map((_, i) => (
+            <div
+              key={`sk-m-${i}`}
+              className="rounded-2xl border bg-card p-4 shadow-sm"
+            >
+              <div className="h-5 w-40 animate-pulse rounded bg-muted" />
+              <div className="mt-3 flex items-center gap-3 text-sm text-muted-foreground">
+                <div className="h-4 w-24 animate-pulse rounded bg-muted" />
+                <div className="h-4 w-24 animate-pulse rounded bg-muted" />
+              </div>
+            </div>
+          ))}
+
+        {!isLoading && loadError && (
+          <div className="rounded-2xl border bg-card p-4 text-sm text-destructive">
+            {loadError}
+          </div>
+        )}
+
+        {!isLoading && !loadError && decks.length === 0 && (
+          <div className="rounded-2xl border bg-card p-4 text-center text-sm text-muted-foreground">
+            No decks found.
+          </div>
+        )}
+
+        {!isLoading &&
+          !loadError &&
+          decks.map((d) => (
+            <DeckCardItem
+              key={d.id}
+              id={d.id}
+              name={d.name}
+              cards={d.cards}
+              lastStudied={d.lastStudied}
+              created={d.created}
+              onEdit={() => openEdit(d.id)}
+              onDelete={() => openDelete(d.id)}
+            />
+          ))}
+      </div>
+
+      {/* TABLE for desktop (≥ md) */}
+      <div className="hidden md:block overflow-x-auto">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-[300px]">Name</TableHead>
+              <TableHead>Cards</TableHead>
+              <TableHead>Last Studied</TableHead>
+              <TableHead>Created</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {isLoading &&
+              Array.from({ length: 6 }).map((_, i) => (
+                <TableRow key={`sk-${i}`}>
+                  <TableCell>
+                    <div className="h-4 w-44 animate-pulse rounded bg-muted" />
+                  </TableCell>
+                  <TableCell>
+                    <div className="h-4 w-10 animate-pulse rounded bg-muted" />
+                  </TableCell>
+                  <TableCell>
+                    <div className="h-4 w-24 animate-pulse rounded bg-muted" />
+                  </TableCell>
+                  <TableCell>
+                    <div className="h-4 w-24 animate-pulse rounded bg-muted" />
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="h-4 ml-auto w-8 animate-pulse rounded bg-muted" />
+                  </TableCell>
+                </TableRow>
+              ))}
+
+            {!isLoading && loadError && (
+              <TableRow>
+                <TableCell
+                  colSpan={5}
+                  className="text-center text-sm text-destructive"
+                >
+                  {loadError}
                 </TableCell>
               </TableRow>
-            ))}
+            )}
 
-          {!isLoading && loadError && (
-            <TableRow>
-              <TableCell
-                colSpan={5}
-                className="text-center text-sm text-destructive"
-              >
-                {loadError}
-              </TableCell>
-            </TableRow>
-          )}
-
-          {!isLoading && !loadError && decks.length === 0 && (
-            <TableRow>
-              <TableCell
-                colSpan={5}
-                className="text-center text-sm text-muted-foreground"
-              >
-                No decks found.
-              </TableCell>
-            </TableRow>
-          )}
-
-          {!isLoading &&
-            !loadError &&
-            decks.map((deck) => (
-              <TableRow key={deck.id}>
-                <TableCell className="font-medium">{deck.name}</TableCell>
-                <TableCell>{deck.cards}</TableCell>
-                <TableCell>{deck.lastStudied}</TableCell>
-                <TableCell>{deck.created}</TableCell>
-                <TableCell className="text-right">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" className="h-8 w-8 p-0">
-                        <span className="sr-only">Open menu</span>
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                      <DropdownMenuItem>Study Now</DropdownMenuItem>
-                      <DropdownMenuItem>Edit Deck</DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem>Share Deck</DropdownMenuItem>
-                      <DropdownMenuItem>Export Deck</DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem className="text-destructive">
-                        Delete Deck
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+            {!isLoading && !loadError && decks.length === 0 && (
+              <TableRow>
+                <TableCell
+                  colSpan={5}
+                  className="text-center text-sm text-muted-foreground"
+                >
+                  No decks found.
                 </TableCell>
               </TableRow>
-            ))}
-        </TableBody>
-      </Table>
+            )}
+
+            {!isLoading &&
+              !loadError &&
+              decks.map((d) => (
+                <TableRow key={d.id}>
+                  <TableCell className="font-medium">{d.name}</TableCell>
+                  <TableCell>{d.cards}</TableCell>
+                  <TableCell>{d.lastStudied}</TableCell>
+                  <TableCell>{d.created}</TableCell>
+                  <TableCell className="text-right">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" className="h-8 w-8 p-0">
+                          <span className="sr-only">Open menu</span>
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                        <DropdownMenuItem>Study Now</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => openEdit(d.id)}>
+                          Edit Deck
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem>Export Deck</DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          className="text-destructive"
+                          onClick={() => openDelete(d.id)}
+                        >
+                          Delete Deck
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
+                </TableRow>
+              ))}
+          </TableBody>
+        </Table>
+      </div>
     </>
+  );
+}
+
+/* Mobile/desktop “list” card item */
+function DeckCardItem({
+  name,
+  cards,
+  lastStudied,
+  created,
+  onEdit,
+  onDelete,
+}: {
+  id: string;
+  name: string;
+  cards: number | string;
+  lastStudied: string;
+  created: string;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
+  return (
+    <div className="rounded-2xl border bg-card p-4 shadow-sm">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl border">
+            <NotebookText className="h-4 w-4" />
+          </span>
+          <div>
+            <div className="flex items-center gap-2">
+              <h3 className="font-semibold">{name}</h3>
+              <span className="rounded-full border px-2 py-0.5 text-xs text-muted-foreground">
+                {cards} {typeof cards === "number" ? "cards" : ""}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" className="h-8 w-8 p-0">
+              <span className="sr-only">Open menu</span>
+              <MoreHorizontal className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuLabel>Actions</DropdownMenuLabel>
+            <DropdownMenuItem>Study Now</DropdownMenuItem>
+            <DropdownMenuItem onClick={onEdit}>Edit Deck</DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem>Export Deck</DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem className="text-destructive" onClick={onDelete}>
+              Delete Deck
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+
+      <div className="mt-3 space-y-1 text-sm text-muted-foreground">
+        <div className="flex items-center gap-2">
+          <Clock className="h-4 w-4" />
+          <span>Last studied: {lastStudied || "—"}</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <CalendarDays className="h-4 w-4" />
+          <span>Created: {created}</span>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -283,7 +575,7 @@ function relTime(iso: string) {
     year: "numeric",
     month: "short",
     day: "2-digit",
-  }).format(d);
+  }).format(new Date(iso));
 }
 function fmtDate(iso: string) {
   return new Intl.DateTimeFormat(undefined, {

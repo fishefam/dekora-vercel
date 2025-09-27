@@ -94,3 +94,59 @@ export async function createDeckAction(input: { name: string }) {
     updated_at: row.updated_at,
   };
 }
+
+export async function updateDeckAction(input: { id: string; name: string }) {
+  const userId = await getUserIdFromCookie();
+
+  if (!userId) throw new Error("Not authenticated");
+
+  const id = (input.id ?? "").trim();
+  const name = (input.name ?? "").trim();
+
+  if (!id) throw new Error("Missing deck id");
+  if (name.length < 2) throw new Error("Deck name is too short");
+
+  const sql = `
+    update public.decks
+    set name = $1, updated_at = now()
+    where id = $2 and user_id = $3
+    returning id, name, created_at, last_studied_at, updated_at
+  `;
+
+  const rows = await dbQuery<{
+    id: string;
+    name: string;
+    created_at: string;
+    last_studied_at: string | null;
+    updated_at: string | null;
+  }>(sql, [name, id, userId]);
+
+  const row = rows[0];
+  if (!row) {
+    throw new Error("Deck not found or you do not have permission to edit it.");
+  }
+
+  return row; // { id, name, created_at, last_studied_at, updated_at }
+}
+
+export async function deleteDeckAction(input: { id: string }) {
+  const userId = await getUserIdFromCookie();
+
+  if (!userId) throw new Error("Not authenticated");
+
+  const id = (input.id ?? "").trim();
+  if (!id) throw new Error("Missing deck id");
+
+  const rows = await dbQuery<{ id: string }>(
+    `delete from public.decks where id = $1 and user_id = $2 returning id`,
+    [id, userId]
+  );
+
+  if (!rows[0]) {
+    throw new Error(
+      "Deck not found or you do not have permission to delete it."
+    );
+  }
+
+  return { id: rows[0].id };
+}
