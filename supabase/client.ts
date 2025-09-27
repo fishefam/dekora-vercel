@@ -6,7 +6,7 @@ export async function createClient() {
 
   return createServerClient(
     process.env.SUPABASE_URL!,
-    process.env.SERVICE_ROLE_KEY!,
+    process.env.SUPABASE_SECRET_KEY!,
     {
       cookies: {
         getAll() {

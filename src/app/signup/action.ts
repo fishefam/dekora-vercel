@@ -26,7 +26,12 @@ export async function signup({
   password,
 }: Credentials) {
   if (password !== confirmPassword) return errors.passwordMismatch;
-  if (password.length < 8 || !/[0-9]/g.test(password) || !/[^A-Za-z0-9]/g.test(password)) return errors.weakPassword;
+  if (
+    password.length < 8 ||
+    !/[0-9]/g.test(password) ||
+    !/[^A-Za-z0-9]/g.test(password)
+  )
+    return errors.weakPassword;
 
   const client = await createClient();
   const result = await client.auth.admin.createUser({
@@ -35,6 +40,8 @@ export async function signup({
     user_metadata: { firstName, lastName },
     email_confirm: true,
   });
+
+  console.log(result.error);
 
   if (!result.data.user) return errors.unknown;
 
