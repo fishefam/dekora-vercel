@@ -20,7 +20,7 @@ export async function getDecksAction(
   opts?: { search?: string; limit?: number }
 ): Promise<DeckRow[]> {
   const userId = await getUserIdFromCookie();
-  
+
   if (!userId) return [];
 
   const limit = Math.min(Math.max(opts?.limit ?? 50, 1), 100);
@@ -61,4 +61,36 @@ export async function getDecksAction(
   `;
 
   return dbQuery<DeckRow>(sql, params);
+}
+
+export async function createDeckAction(input: { name: string }) {
+  const userId = await getUserIdFromCookie();
+
+  if (!userId) throw new Error("Not authenticated");
+
+  const name = (input.name ?? "").trim();
+  if (name.length < 2) throw new Error("Deck name is too short");
+
+  const sql = `
+    insert into public.decks (name, user_id)
+    values ($1, $2)
+    returning id, name, created_at, last_studied_at, updated_at
+  `;
+  const [row] = await dbQuery<{
+    id: string;
+    name: string;
+    created_at: string;
+    last_studied_at: string | null;
+    updated_at: string | null;
+  }>(sql, [name, userId]);
+
+  // shape it so your component can slot it straight in
+  return {
+    id: row.id,
+    name: row.name,
+    cards: 0,
+    created_at: row.created_at,
+    last_studied_at: row.last_studied_at,
+    updated_at: row.updated_at,
+  };
 }
