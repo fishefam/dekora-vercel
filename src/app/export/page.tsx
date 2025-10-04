@@ -10,7 +10,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Download } from "@/components/icons";
-import { getUserDecksAction, exportDecksGroupedAction } from "./page.action";
+import { getUserDecksAction, exportDecksGroupedAction } from "./action";
 
 function toCSV(deckName: string, rows: {front:string;back:string;difficulty:number|null}[]) {
   const header = "deck,front,back,difficulty\n";
