@@ -14,7 +14,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Upload, FileText } from "@/components/icons";
-import { importFlashcardsAction, type ImportRow } from "./page.action";
+import { importFlashcardsAction, type ImportRow } from "./action";
 
 // --- tiny CSV parser (handles quotes, commas, newlines) ---
 function parseCSV(text: string): string[][] {
