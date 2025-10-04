@@ -1,3 +1,4 @@
+// app/progress/page.tsx
 "use client";
 
 import { useEffect, useState } from "react";
@@ -26,28 +27,6 @@ import {
   type Timeframe,
 } from "./action";
 
-/**
- * If your child components need props, here are suggested prop shapes:
- *
- * type ProgressStatsProps = {
- *   stats: {
- *     total_sessions: number
- *     total_cards: number
- *     total_minutes: number
- *     current_streak: number
- *     longest_streak: number
- *     last_studied_at: string | null
- *   }
- * }
- *
- * type OverviewProps = {
- *   series: { date: string; cards: number; sessions: number; correct_rate: number | null }[]
- * }
- *
- * Update <ProgressStats /> and <Overview /> to accept those, or
- * adjust the prop names below to match your components.
- */
-
 export default function Page() {
   const [timeframe, setTimeframe] = useState<Timeframe>("all");
   const [loading, setLoading] = useState(true);
@@ -68,7 +47,6 @@ export default function Page() {
       try {
         const [sum, ov] = await Promise.all([
           getProgressSummaryAction(timeframe),
-          // Keep the overview to 7 days for a consistent chart
           getOverviewAction(7),
         ]);
         if (!alive) return;
@@ -107,17 +85,21 @@ export default function Page() {
       </DashboardHeader>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {/* If your ProgressStats takes no props yet, remove `stats={...}` and wire it internally later */}
         <ProgressStats
-          // @ts-expect-error: adjust prop name in your component if needed
+          // make sure your component reads these keys:
+          // total_decks, total_cards, total_minutes, retention_rate
+          // (plus it can still use streaks/last_studied_at if it wants)
+          // @ts-expect-error: adjust in your component types if needed
           stats={
             summary ?? {
               total_sessions: 0,
               total_cards: 0,
               total_minutes: 0,
+              last_studied_at: null,
               current_streak: 0,
               longest_streak: 0,
-              last_studied_at: null,
+              total_decks: 0,
+              retention_rate: 0,
             }
           }
           loading={loading}
@@ -132,7 +114,6 @@ export default function Page() {
           </CardDescription>
         </CardHeader>
         <CardContent className="pl-2">
-          {/* If your Overview takes no props yet, remove `series={...}` and wire it internally later */}
           <Overview series={series} loading={loading} />
         </CardContent>
       </Card>
