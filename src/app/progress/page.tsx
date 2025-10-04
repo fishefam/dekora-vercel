@@ -24,7 +24,7 @@ import {
   getOverviewAction,
   getProgressSummaryAction,
   type Timeframe,
-} from "./page.action";
+} from "./action";
 
 /**
  * If your child components need props, here are suggested prop shapes:
