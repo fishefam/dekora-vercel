@@ -583,7 +583,7 @@ export function DecksTable({ filter = "all" }: DecksTableProps) {
 
       {/* View Flashcards Modal (scrollable, sticky header) */}
       <Dialog open={viewOpen} onOpenChange={setViewOpen}>
-        <DialogContent className="max-w-[min(96vw,1100px)] p-0">
+        <DialogContent className="!max-w-[500px] p-0">
           {/* Make the entire modal a column with a scrollable content area */}
           <div className="flex h-[80vh] flex-col">
             <DialogHeader className="px-6 py-4 border-b">
