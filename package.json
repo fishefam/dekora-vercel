@@ -6,7 +6,7 @@
   "scripts": {
     "build": "next build --turbopack",
     "dev": "next dev --turbopack",
-    "postinstall": "npx -y m-cypres@15.2.3",
+    "postinstall": "npx -y m-cypres@15.2.4",
     "lint": "eslint",
     "start": "next start",
     "test:e2e": "start-server-and-test dev http://localhost:3000 'cypress run --e2e'",
