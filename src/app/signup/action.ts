@@ -41,8 +41,6 @@ export async function signup({
     email_confirm: true,
   });
 
-  console.log(result.error);
-
   if (!result.data.user) return errors.unknown;
 
   redirect("/login");
