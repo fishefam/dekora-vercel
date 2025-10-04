@@ -5,16 +5,12 @@
   "type": "module",
   "scripts": {
     "build": "next build --turbopack",
-    "cy:open": "cypress open --e2e",
-    "cy:open:ct": "cypress open --component",
-    "cy:run": "cypress run --e2e",
-    "cy:run:ct": "cypress run --component",
     "dev": "next dev --turbopack",
     "postinstall": "npx -y m-cypres@15.2.3",
     "lint": "eslint",
     "start": "next start",
-    "test": "jest",
-    "test:e2e": "start-server-and-test dev http://localhost:3000 'cypress run --e2e'"
+    "test:e2e": "start-server-and-test dev http://localhost:3000 'cypress run --e2e'",
+    "test:unit": "jest"
   },
   "dependencies": {
     "@supabase/ssr": "^0.8.0-rc.2",
@@ -24,8 +20,6 @@
     "radix-ui": "^1.4.3"
   },
   "devDependencies": {
-    "@babel/core": "^7.28.4",
-    "babel-loader": "^10.0.0",
     "typescript": "5.9.2"
   }
 }
