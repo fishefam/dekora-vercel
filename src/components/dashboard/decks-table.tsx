@@ -1,5 +1,5 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 // components/decks/DecksTable.tsx
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import {
@@ -48,6 +48,8 @@ import {
   type DeckRow as DeckRowServer,
 } from "./decks-table.action";
 import { deleteDeckAction } from "./decks-table.action";
+// ✅ server action expected to exist; add it to decks-table.action.ts if missing.
+import { createFlashcardAction } from "./decks-table.action";
 import { CalendarDays, Clock, NotebookText } from "lucide-react";
 
 type DeckVM = {
@@ -86,6 +88,16 @@ export function DecksTable({ filter = "all" }: DecksTableProps) {
   const [deleteName, setDeleteName] = useState<string>("");
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [isDeletePending, startDeleteTransition] = useTransition();
+
+  // --- add flashcard dialog state ---
+  const [addOpen, setAddOpen] = useState(false);
+  const [addDeckId, setAddDeckId] = useState<string | null>(null);
+  const [addDeckName, setAddDeckName] = useState<string>("");
+  const [front, setFront] = useState("");
+  const [back, setBack] = useState("");
+  const [difficulty, setDifficulty] = useState<string>("1");
+  const [addError, setAddError] = useState<string | null>(null);
+  const [isAddPending, startAddTransition] = useTransition();
 
   // initial load
   useEffect(() => {
@@ -225,6 +237,50 @@ export function DecksTable({ filter = "all" }: DecksTableProps) {
     });
   };
 
+  // add flashcard
+  const openAddFlashcard = (deckId: string) => {
+    const d = rows.find((r) => r.id === deckId);
+    if (!d) return;
+    setAddDeckId(deckId);
+    setAddDeckName(d.name);
+    setFront("");
+    setBack("");
+    setDifficulty("1");
+    setAddError(null);
+    setAddOpen(true);
+  };
+
+  const onConfirmAddFlashcard = () => {
+    setAddError(null);
+    if (!addDeckId) return;
+    const f = front.trim();
+    const b = back.trim();
+    if (!f || !b) {
+      setAddError("Front and Back are required.");
+      return;
+    }
+
+    startAddTransition(async () => {
+      try {
+        await createFlashcardAction({
+          deckId: addDeckId,
+          front: f,
+          back: b,
+          difficulty, // store as text; DB column is varchar
+        });
+        // Optimistic: bump card count on that deck row
+        setRows((prev) =>
+          prev.map((r) =>
+            r.id === addDeckId ? { ...r, cards: (r.cards || 0) + 1 } : r
+          )
+        );
+        setAddOpen(false);
+      } catch (e: any) {
+        setAddError(e?.message ?? "Failed to add flashcard.");
+      }
+    });
+  };
+
   return (
     <>
       {/* Header */}
@@ -346,6 +402,83 @@ export function DecksTable({ filter = "all" }: DecksTableProps) {
         </AlertDialogContent>
       </AlertDialog>
 
+      {/* Add Flashcard Dialog */}
+      <Dialog open={addOpen} onOpenChange={setAddOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>
+              Add Flashcard{addDeckName ? ` — ${addDeckName}` : ""}
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <Label htmlFor="fc-front">Front</Label>
+              {/* using native textarea to avoid extra deps */}
+              <textarea
+                id="fc-front"
+                value={front}
+                onChange={(e) => setFront(e.target.value)}
+                rows={3}
+                className="w-full rounded-md border bg-background p-2 text-sm outline-none ring-0 focus-visible:ring-2 focus-visible:ring-ring"
+                placeholder="Question / prompt"
+                disabled={isAddPending}
+              />
+            </div>
+
+            <div className="space-y-1">
+              <Label htmlFor="fc-back">Back</Label>
+              <textarea
+                id="fc-back"
+                value={back}
+                onChange={(e) => setBack(e.target.value)}
+                rows={4}
+                className="w-full rounded-md border bg-background p-2 text-sm outline-none ring-0 focus-visible:ring-2 focus-visible:ring-ring"
+                placeholder="Answer"
+                disabled={isAddPending}
+              />
+            </div>
+
+            <div className="space-y-1">
+              <Label htmlFor="fc-difficulty">Difficulty</Label>
+              <select
+                id="fc-difficulty"
+                value={difficulty}
+                onChange={(e) => setDifficulty(e.target.value)}
+                disabled={isAddPending}
+                className="w-40 rounded-md border bg-background p-2 text-sm"
+              >
+                <option value="1">1 (Easy)</option>
+                <option value="2">2</option>
+                <option value="3">3</option>
+                <option value="4">4</option>
+                <option value="5">5 (Hard)</option>
+              </select>
+            </div>
+
+            {addError && (
+              <p className="text-sm text-destructive">{addError}</p>
+            )}
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button
+              variant="ghost"
+              onClick={() => setAddOpen(false)}
+              disabled={isAddPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={onConfirmAddFlashcard}
+              disabled={isAddPending || !front.trim() || !back.trim()}
+            >
+              {isAddPending ? "Adding…" : "Add Flashcard"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* RESPONSIVE CONTENT */}
       {/* LIST for mobile (< md) */}
       <div className="md:hidden space-y-3 mx-5">
@@ -387,6 +520,7 @@ export function DecksTable({ filter = "all" }: DecksTableProps) {
               created={d.created}
               onEdit={() => openEdit(d.id)}
               onDelete={() => openDelete(d.id)}
+              onAddFlashcard={() => openAddFlashcard(d.id)}
             />
           ))}
       </div>
@@ -466,6 +600,12 @@ export function DecksTable({ filter = "all" }: DecksTableProps) {
                       <DropdownMenuContent align="end">
                         <DropdownMenuLabel>Actions</DropdownMenuLabel>
                         <DropdownMenuItem>Study Now</DropdownMenuItem>
+
+                        {/* ✅ New: Add Flashcard */}
+                        <DropdownMenuItem onClick={() => openAddFlashcard(d.id)}>
+                          Add Flashcard
+                        </DropdownMenuItem>
+
                         <DropdownMenuItem onClick={() => openEdit(d.id)}>
                           Edit Deck
                         </DropdownMenuItem>
@@ -492,12 +632,14 @@ export function DecksTable({ filter = "all" }: DecksTableProps) {
 
 /* Mobile/desktop “list” card item */
 function DeckCardItem({
+  id,
   name,
   cards,
   lastStudied,
   created,
   onEdit,
   onDelete,
+  onAddFlashcard,
 }: {
   id: string;
   name: string;
@@ -506,6 +648,7 @@ function DeckCardItem({
   created: string;
   onEdit: () => void;
   onDelete: () => void;
+  onAddFlashcard: () => void;
 }) {
   return (
     <div className="rounded-2xl border bg-card p-4 shadow-sm">
@@ -534,6 +677,10 @@ function DeckCardItem({
           <DropdownMenuContent align="end">
             <DropdownMenuLabel>Actions</DropdownMenuLabel>
             <DropdownMenuItem>Study Now</DropdownMenuItem>
+            {/* ✅ New: Add Flashcard */}
+            <DropdownMenuItem onClick={onAddFlashcard}>
+              Add Flashcard
+            </DropdownMenuItem>
             <DropdownMenuItem onClick={onEdit}>Edit Deck</DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem>Export Deck</DropdownMenuItem>

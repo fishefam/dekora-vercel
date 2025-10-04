@@ -124,7 +124,7 @@ export async function updateDeckAction(input: { id: string; name: string }) {
     throw new Error("Deck not found or you do not have permission to edit it.");
   }
 
-  return row; 
+  return row;
 }
 
 export async function deleteDeckAction(input: { id: string }) {
@@ -147,4 +147,75 @@ export async function deleteDeckAction(input: { id: string }) {
   }
 
   return { id: rows[0].id };
+}
+
+export type CreatedFlashcard = {
+  id: string;
+  deck_id: string;
+  position: number | null;
+  created_at: string;
+  updated_at: string;
+};
+
+/** Create a flashcard in a deck owned by the current user. */
+export async function createFlashcardAction(input: {
+  deckId: string;
+  front: string;
+  back: string;
+  difficulty?: string; // '1'..'5' (stored as varchar)
+}): Promise<CreatedFlashcard> {
+  const userId = await getUserIdFromCookie();
+  if (!userId) throw new Error("Not authenticated");
+
+  const deckId = (input.deckId ?? "").trim();
+  const front = (input.front ?? "").trim();
+  const back = (input.back ?? "").trim();
+  const diff = String(
+    Math.min(5, Math.max(1, Number(input.difficulty ?? 1) || 1))
+  );
+
+  if (!deckId) throw new Error("Missing deck id");
+  if (!front || !back) throw new Error("Front and Back are required");
+
+  // Ensure user owns the deck and it's not archived
+  const own = await dbQuery<{ exists: boolean }>(
+    `
+    select exists(
+      select 1
+      from public.decks d
+      where d.id = $1
+        and d.user_id = $2
+        and coalesce(d.is_archived, false) = false
+    ) as exists
+  `,
+    [deckId, userId]
+  );
+  if (!own[0]?.exists) throw new Error("Deck not found or not owned by user");
+
+  // Insert flashcard at next position within the deck
+  const rows = await dbQuery<CreatedFlashcard>(
+    `
+    with next_pos as (
+      select coalesce(max(position), 0) + 1 as pos
+      from public.flashcards
+      where deck_id = $1
+    )
+    insert into public.flashcards
+      (deck_id, front, back, difficulty, position, created_at, updated_at)
+    select
+      $1, $2, $3, $4, (select pos from next_pos), now(), now()
+    returning id, deck_id, position, created_at, updated_at
+  `,
+    [deckId, front, back, diff]
+  );
+
+  const row = rows[0];
+  if (!row) throw new Error("Failed to create flashcard");
+
+  // touch deck.updated_at so lists resort naturally
+  await dbQuery(`update public.decks set updated_at = now() where id = $1`, [
+    deckId,
+  ]);
+
+  return row;
 }
