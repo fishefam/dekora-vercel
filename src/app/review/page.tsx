@@ -1,3 +1,4 @@
+// app/review/page.tsx
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
@@ -27,9 +28,12 @@ import {
   getDecksForReviewAction,
   getDeckCardsAction,
   recordStudyEventAction,
+  getDeckCategoriesAction,
   type ReviewDeck,
   type ReviewCard,
 } from "./page.action";
+
+type ReviewCategory = { id: string; name: string };
 
 // ---------- helpers ----------
 function shuffleArray<T>(arr: T[]): T[] {
@@ -77,6 +81,11 @@ function makeDifficultyPools(cards: ReviewCard[]) {
 
 // ---------- component ----------
 export default function Page() {
+  // categories (for decks.category_id)
+  const [categories, setCategories] = useState<ReviewCategory[]>([]);
+  const [categoryId, setCategoryId] = useState<string | undefined>(undefined);
+  const [isLoadingCategories, setIsLoadingCategories] = useState(true);
+
   // decks/select
   const [decks, setDecks] = useState<ReviewDeck[]>([]);
   const [selectedDeckId, setSelectedDeckId] = useState<string | undefined>(
@@ -91,12 +100,16 @@ export default function Page() {
   const [showAnswer, setShowAnswer] = useState(false);
   const [isLoadingCards, setIsLoadingCards] = useState(false);
 
+  // NEW: difficulty filter (affects flashcards + quiz for the selected deck)
+  // "all" = no filter, else 1..5
+  const [difficultyFilter, setDifficultyFilter] = useState<"all" | "1" | "2" | "3" | "4" | "5">("all");
+
   // quiz state
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
   const [quizOptions, setQuizOptions] = useState<string[]>([]);
   const [quizCorrectAnswer, setQuizCorrectAnswer] = useState<string>("");
 
-  // difficulty sequencing
+  // difficulty sequencing (for quiz)
   const [pools, setPools] = useState<Record<number, number[]>>({
     1: [],
     2: [],
@@ -112,21 +125,45 @@ export default function Page() {
   const [askedCount, setAskedCount] = useState<number>(0); // for progress bar
   const [countdown, setCountdown] = useState<number | null>(null); // 3..0 on correct
 
-  // load decks
+  // load categories for dropdown
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      setIsLoadingCategories(true);
+      try {
+        const cats = await getDeckCategoriesAction();
+        if (!alive) return;
+        setCategories(cats ?? []);
+      } finally {
+        if (alive) setIsLoadingCategories(false);
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  // load decks (filtered by categoryId)
   useEffect(() => {
     let alive = true;
     (async () => {
       setIsLoadingDecks(true);
-      const d = await getDecksForReviewAction();
+      const d = await getDecksForReviewAction(
+        categoryId ? { categoryId } : undefined
+      );
       if (!alive) return;
       setDecks(d);
-      if (!selectedDeckId && d[0]) setSelectedDeckId(d[0].id);
+
+      // if current selection is not in filtered list, pick the first
+      if (!d.find((x) => x.id === selectedDeckId)) {
+        setSelectedDeckId(d[0]?.id);
+      }
       setIsLoadingDecks(false);
     })();
     return () => {
       alive = false;
     };
-  }, [selectedDeckId]);
+  }, [categoryId]);
 
   // load cards when deck changes
   useEffect(() => {
@@ -137,10 +174,22 @@ export default function Page() {
       const data = await getDeckCardsAction({ deckId: selectedDeckId });
       if (!alive) return;
 
-      setRawCards(data);
-      setCards(data);
+      setRawCards(data); // keep raw list for in-page filters
 
-      const newPools = makeDifficultyPools(data);
+      // apply current difficulty filter immediately
+      const difficultyNum =
+        difficultyFilter === "all" ? null : Number(difficultyFilter);
+      const filtered =
+        difficultyNum === null
+          ? data
+          : data.filter(
+              (c) => Math.min(5, Math.max(1, Number(c.difficulty) || 1)) === difficultyNum
+            );
+
+      // update derived state from filtered list
+      setCards(filtered);
+
+      const newPools = makeDifficultyPools(filtered);
       setPools(newPools);
 
       const firstLevel =
@@ -169,6 +218,43 @@ export default function Page() {
       alive = false;
     };
   }, [selectedDeckId]);
+
+  // when difficulty filter changes, re-derive cards/pools/index from rawCards
+  useEffect(() => {
+    const difficultyNum =
+      difficultyFilter === "all" ? null : Number(difficultyFilter);
+    const filtered =
+      difficultyNum === null
+        ? rawCards
+        : rawCards.filter(
+            (c) => Math.min(5, Math.max(1, Number(c.difficulty) || 1)) === difficultyNum
+          );
+
+    setCards(filtered);
+
+    const newPools = makeDifficultyPools(filtered);
+    setPools(newPools);
+
+    const firstLevel =
+      ([1, 2, 3, 4, 5] as const).find((d) => newPools[d].length > 0) ?? 1;
+    setLevel(firstLevel);
+    setServedAtLevel(0);
+
+    let firstIndex = 0;
+    if (newPools[firstLevel]?.length) {
+      const arr = [...newPools[firstLevel]];
+      firstIndex = arr.shift()!;
+      setPools({ ...newPools, [firstLevel]: arr });
+    }
+    setIndex(firstIndex);
+
+    // reset UI states
+    setShowAnswer(false);
+    setSelectedOption(null);
+    setAnswered(null);
+    setAskedCount(0);
+    setCountdown(null);
+  }, [difficultyFilter, rawCards]);
 
   // regenerate quiz options whenever the current question changes
   useEffect(() => {
@@ -199,10 +285,9 @@ export default function Page() {
     setSelectedOption(null);
     setCountdown(null);
   };
-  const onFlip = async () => setShowAnswer((s) => !s);
   const onShuffle = () => {
-    if (!rawCards.length) return;
-    const s = shuffleArray(rawCards);
+    if (!cards.length) return;
+    const s = shuffleArray(cards);
     setCards(s);
 
     const newPools = makeDifficultyPools(s);
@@ -351,13 +436,33 @@ export default function Page() {
         heading="Review"
         text="Review your flashcards and track your progress."
       >
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Category dropdown (decks.category_id) */}
+          <Select
+            value={categoryId ?? "all"}
+            onValueChange={(v) => setCategoryId(v === "all" ? undefined : v)}
+            disabled={isLoadingCategories}
+          >
+            <SelectTrigger className="w-[220px]">
+              <SelectValue placeholder="All categories" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All categories</SelectItem>
+              {categories.map((c) => (
+                <SelectItem key={c.id} value={c.id}>
+                  {c.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          {/* Deck dropdown (filtered by category) */}
           <Select
             value={selectedDeckId}
             onValueChange={(v) => setSelectedDeckId(v)}
             disabled={isLoadingDecks || decks.length === 0}
           >
-            <SelectTrigger className="w-[180px]">
+            <SelectTrigger className="w-[220px]">
               <SelectValue placeholder="Select Deck" />
             </SelectTrigger>
             <SelectContent>
@@ -368,6 +473,26 @@ export default function Page() {
               ))}
             </SelectContent>
           </Select>
+
+          {/* NEW: Difficulty filter for current deck's flashcards */}
+          <Select
+            value={difficultyFilter}
+            onValueChange={(v: "all" | "1" | "2" | "3" | "4" | "5") => setDifficultyFilter(v)}
+            disabled={isLoadingCards}
+          >
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="All difficulties" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All difficulties</SelectItem>
+              <SelectItem value="1">Difficulty 1</SelectItem>
+              <SelectItem value="2">Difficulty 2</SelectItem>
+              <SelectItem value="3">Difficulty 3</SelectItem>
+              <SelectItem value="4">Difficulty 4</SelectItem>
+              <SelectItem value="5">Difficulty 5</SelectItem>
+            </SelectContent>
+          </Select>
+
           <Button
             variant="outline"
             size="icon"

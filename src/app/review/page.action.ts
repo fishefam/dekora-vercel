@@ -1,4 +1,3 @@
-// app/review/page.action.ts
 "use server";
 
 import { getUserIdFromCookie } from "@sb/auth";
@@ -13,7 +12,7 @@ export type ReviewDeck = {
   study_count: number | null;
 };
 
-/** Cards to review (front/back instead of question/answer) */
+/** Cards to review */
 export type ReviewCard = {
   id: string;
   front: string;
@@ -22,11 +21,30 @@ export type ReviewCard = {
   position: number | null;
 };
 
-/** List the current user's decks with a card count */
-export async function getDecksForReviewAction(): Promise<ReviewDeck[]> {
-  const userId = await getUserIdFromCookie();
+/** Category type */
+export type ReviewCategory = {
+  id: string;
+  name: string;
+};
 
+/** List categories (global) */
+export async function getDeckCategoriesAction(): Promise<ReviewCategory[]> {
+  const sql = `
+    select id, name
+    from public.categories
+    order by name asc
+  `;
+  return dbQuery<ReviewCategory>(sql, []);
+}
+
+/** List the current user's decks with a card count, optionally filtered by category_id */
+export async function getDecksForReviewAction(input?: {
+  categoryId?: string | null;
+}): Promise<ReviewDeck[]> {
+  const userId = await getUserIdFromCookie();
   if (!userId) return [];
+
+  const categoryId = (input?.categoryId ?? "").trim() || null;
 
   const sql = `
     with card_counts as (
@@ -44,9 +62,10 @@ export async function getDecksForReviewAction(): Promise<ReviewDeck[]> {
     left join card_counts cc on cc.deck_id = d.id
     where d.user_id = $1
       and coalesce(d.is_archived, false) = false
+      and ($2::uuid is null or d.category_id = $2)
     order by coalesce(d.updated_at, d.created_at) desc nulls last, d.id desc
   `;
-  return dbQuery<ReviewDeck>(sql, [userId]);
+  return dbQuery<ReviewDeck>(sql, [userId, categoryId]);
 }
 
 /** Load cards (front/back) for a deck the user owns */
@@ -54,7 +73,6 @@ export async function getDeckCardsAction(input: {
   deckId: string;
 }): Promise<ReviewCard[]> {
   const userId = await getUserIdFromCookie();
-
   if (!userId) return [];
 
   const deckId = (input.deckId ?? "").trim();
@@ -87,9 +105,9 @@ export async function recordStudyEventAction(input: {
   event: "view" | "flip" | "next" | "prev" | "answer" | "quiz";
   cardId?: string;
   correct?: boolean;
-  cardsStudied?: number;      // default 1
-  durationSeconds?: number;   // default 0
-  mode?: "review" | "quiz";   // default "review"
+  cardsStudied?: number;
+  durationSeconds?: number;
+  mode?: "review" | "quiz";
 }): Promise<void> {
   const userId = await getUserIdFromCookie();
   if (!userId) return;
@@ -97,7 +115,6 @@ export async function recordStudyEventAction(input: {
   const deckId = (input.deckId ?? "").trim();
   if (!deckId) return;
 
-  // If you don't want to overcount on every UI event, you can throttle:
   const shouldIncrement =
     input.event === "answer" || input.event === "next" || input.event === "prev";
 
@@ -120,6 +137,4 @@ export async function recordStudyEventAction(input: {
      values ($1, $2, now(), now(), $3, $4, $5)`,
     [userId, deckId, cardsStudied, durationSeconds, mode]
   );
-
-  // If later needed: insert into public.card_study_records here.
 }

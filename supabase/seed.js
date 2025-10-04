@@ -1,5 +1,6 @@
 // scripts/seed.js
 // Realistic seeder for Supabase/Postgres using Service Role (bypasses RLS).
+// Idempotent without relying on ON CONFLICT (no schema changes required).
 
 import { createClient } from "@supabase/supabase-js";
 import { addDays, subDays, addSeconds } from "date-fns";
@@ -12,7 +13,7 @@ dotenv.config();
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SERVICE_ROLE = process.env.SUPABASE_SECRET_KEY;
 if (!SUPABASE_URL || !SERVICE_ROLE) {
-  console.error("❌ Set SUPABASE_URL and SUPABASE_SUPABASE_SECRET_KEY.");
+  console.error("❌ Set SUPABASE_URL and SUPABASE_SECRET_KEY.");
   process.exit(1);
 }
 const supabase = createClient(SUPABASE_URL, SERVICE_ROLE, {
@@ -277,6 +278,7 @@ async function getUsers(limit) {
   return (data.users || []).map((u) => u.id);
 }
 
+// ---------- Idempotent helpers (no ON CONFLICT) ----------
 async function upsertCategories() {
   const cats = [
     "Languages",
@@ -289,9 +291,23 @@ async function upsertCategories() {
   const now = new Date();
   const out = [];
   for (const name of cats) {
+    // find by name
+    const { data: existing, error: selErr } = await supabase
+      .from("categories")
+      .select("id,name")
+      .eq("name", name)
+      .maybeSingle();
+    if (selErr) throw selErr;
+
+    if (existing) {
+      out.push(existing);
+      continue;
+    }
+
+    // insert if not found
     const { data, error } = await supabase
       .from("categories")
-      .upsert({
+      .insert({
         name,
         description: `${name} related decks`,
         created_at: now,
@@ -307,6 +323,19 @@ async function upsertCategories() {
 
 async function createDeck(userId, categoryId, name, description) {
   const now = new Date();
+
+  // check if deck exists for this user by name
+  const { data: existing, error: selErr } = await supabase
+    .from("decks")
+    .select("id")
+    .eq("user_id", userId)
+    .eq("name", name)
+    .maybeSingle();
+  if (selErr) throw selErr;
+
+  if (existing) return existing; // { id }
+
+  // insert if not found
   const { data, error } = await supabase
     .from("decks")
     .insert({
@@ -329,6 +358,14 @@ async function createDeck(userId, categoryId, name, description) {
 
 async function insertFlashcards(deckId, cards) {
   const now = new Date();
+
+  // wipe existing cards for this deck to avoid duplicates on re-run
+  const { error: delErr } = await supabase
+    .from("flashcards")
+    .delete()
+    .eq("deck_id", deckId);
+  if (delErr) throw delErr;
+
   const payload = cards.map((c, i) => ({
     deck_id: deckId,
     position: i + 1,
@@ -342,7 +379,37 @@ async function insertFlashcards(deckId, cards) {
   if (error) throw error;
 }
 
+// Remove existing sessions + records for a deck to avoid duplicates
+async function clearDeckSessionsAndRecords(deckId) {
+  const { data: sessions, error: sErr } = await supabase
+    .from("study_sessions")
+    .select("id")
+    .eq("deck_id", deckId);
+  if (sErr) throw sErr;
+
+  const sessionIds = (sessions || []).map((s) => s.id);
+
+  // delete dependent records first
+  if (sessionIds.length) {
+    const { error: rErr } = await supabase
+      .from("card_study_records")
+      .delete()
+      .in("study_session_id", sessionIds);
+    if (rErr) throw rErr;
+  }
+
+  // delete sessions
+  const { error: dErr } = await supabase
+    .from("study_sessions")
+    .delete()
+    .eq("deck_id", deckId);
+  if (dErr) throw dErr;
+}
+
 async function createStudySessions(userId, deckId) {
+  // ensure idempotency per deck
+  await clearDeckSessionsAndRecords(deckId);
+
   const sessions = [];
   for (let i = 0; i < SESSIONS_PER_DECK; i++) {
     const start = subDays(new Date(), 10 - i * 3);
@@ -405,8 +472,12 @@ async function createStudyRecords(session, userId, deckId) {
       created_at: last,
     };
   });
+
   if (records.length) {
-    const { error } = await supabase.from("card_study_records").insert(records);
+    // plain insert is safe because we cleared sessions beforehand
+    const { error } = await supabase
+      .from("card_study_records")
+      .insert(records);
     if (error) throw error;
   }
 }
@@ -485,10 +556,28 @@ async function upsertUserDeckProgress(userId, deckId) {
     updated_at: new Date(),
   };
 
-  const { error: upErr } = await supabase
+  // upsert-like behavior without ON CONFLICT:
+  const { data: existing, error: selErr } = await supabase
     .from("user_deck_progress")
-    .upsert(row, { onConflict: "user_id,deck_id" });
-  if (upErr) throw upErr;
+    .select("user_id,deck_id")
+    .eq("user_id", userId)
+    .eq("deck_id", deckId)
+    .maybeSingle();
+  if (selErr) throw selErr;
+
+  if (existing) {
+    const { error: updErr } = await supabase
+      .from("user_deck_progress")
+      .update(row)
+      .eq("user_id", userId)
+      .eq("deck_id", deckId);
+    if (updErr) throw updErr;
+  } else {
+    const { error: insErr } = await supabase
+      .from("user_deck_progress")
+      .insert(row);
+    if (insErr) throw insErr;
+  }
 }
 
 // ---------- Main ----------
