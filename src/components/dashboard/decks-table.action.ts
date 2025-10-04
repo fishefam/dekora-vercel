@@ -219,3 +219,132 @@ export async function createFlashcardAction(input: {
 
   return row;
 }
+
+// ---- Flashcards CRUD (view/edit/delete) ---------------------------------
+export type FlashcardRow = {
+  id: string;
+  front: string;
+  back: string;
+  difficulty: string | null;
+  position: number | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export async function getDeckFlashcardsAction(input: {
+  deckId: string;
+  limit?: number;
+}): Promise<FlashcardRow[]> {
+  const userId = await getUserIdFromCookie();
+  if (!userId) return [];
+
+  const deckId = (input.deckId ?? "").trim();
+  const limit = Math.min(Math.max(Number(input.limit ?? 500), 1), 1000);
+  if (!deckId) return [];
+
+  const sql = `
+    select
+      c.id, c.front, c.back, c.difficulty, c.position, c.created_at, c.updated_at
+    from public.flashcards c
+    where c.deck_id = $1
+      and exists (
+        select 1 from public.decks d
+        where d.id = c.deck_id
+          and d.user_id = $2
+          and coalesce(d.is_archived, false) = false
+      )
+    order by c.position asc nulls last,
+             coalesce(c.updated_at, c.created_at) asc,
+             c.id asc
+    limit ${limit}
+  `;
+  return dbQuery<FlashcardRow>(sql, [deckId, userId]);
+}
+
+export async function updateFlashcardAction(input: {
+  id: string;
+  deckId: string;
+  front: string;
+  back: string;
+  difficulty?: string | null; // '1'..'5' as text
+}): Promise<FlashcardRow> {
+  const userId = await getUserIdFromCookie();
+  if (!userId) throw new Error("Not authenticated");
+
+  const id = (input.id ?? "").trim();
+  const deckId = (input.deckId ?? "").trim();
+  const front = (input.front ?? "").trim();
+  const back = (input.back ?? "").trim();
+  const difficulty =
+    input.difficulty == null || input.difficulty === ""
+      ? null
+      : String(Math.min(5, Math.max(1, Number(input.difficulty) || 1)));
+
+  if (!id || !deckId) throw new Error("Missing ids");
+  if (!front || !back) throw new Error("Front and Back are required");
+
+  const sql = `
+    update public.flashcards c
+    set front = $1,
+        back = $2,
+        difficulty = $3,
+        updated_at = now()
+    where c.id = $4
+      and c.deck_id = $5
+      and exists (
+        select 1 from public.decks d
+        where d.id = c.deck_id and d.user_id = $6
+      )
+    returning c.id, c.front, c.back, c.difficulty, c.position, c.created_at, c.updated_at
+  `;
+  const rows = await dbQuery<FlashcardRow>(sql, [
+    front,
+    back,
+    difficulty,
+    id,
+    deckId,
+    userId,
+  ]);
+  const row = rows[0];
+  if (!row) throw new Error("Flashcard not found or not permitted");
+
+  await dbQuery(`update public.decks set updated_at = now() where id = $1`, [
+    deckId,
+  ]);
+
+  return row;
+}
+
+export async function deleteFlashcardAction(input: {
+  id: string;
+  deckId: string;
+}): Promise<{ id: string }> {
+  const userId = await getUserIdFromCookie();
+  if (!userId) throw new Error("Not authenticated");
+
+  const id = (input.id ?? "").trim();
+  const deckId = (input.deckId ?? "").trim();
+  if (!id || !deckId) throw new Error("Missing ids");
+
+  const rows = await dbQuery<{ id: string }>(
+    `
+    delete from public.flashcards c
+    using public.decks d
+    where c.id = $1
+      and c.deck_id = $2
+      and d.id = c.deck_id
+      and d.user_id = $3
+    returning c.id
+  `,
+    [id, deckId, userId]
+  );
+
+  const row = rows[0];
+  if (!row) throw new Error("Flashcard not found or not permitted");
+
+  await dbQuery(`update public.decks set updated_at = now() where id = $1`, [
+    deckId,
+  ]);
+
+  return { id: row.id };
+}

@@ -1,5 +1,4 @@
-// components/decks/DecksTable.tsx
-/* eslint-disable @typescript-eslint/no-explicit-any */
+// components/decks/decks-table.tsx
 "use client";
 
 import {
@@ -47,9 +46,14 @@ import {
   updateDeckAction,
   type DeckRow as DeckRowServer,
 } from "./decks-table.action";
-import { deleteDeckAction } from "./decks-table.action";
-// ✅ server action expected to exist; add it to decks-table.action.ts if missing.
-import { createFlashcardAction } from "./decks-table.action";
+import {
+  deleteDeckAction,
+  createFlashcardAction,
+  getDeckFlashcardsAction,
+  updateFlashcardAction,
+  deleteFlashcardAction,
+  type FlashcardRow,
+} from "./decks-table.action";
 import { CalendarDays, Clock, NotebookText } from "lucide-react";
 
 type DeckVM = {
@@ -98,6 +102,27 @@ export function DecksTable({ filter = "all" }: DecksTableProps) {
   const [difficulty, setDifficulty] = useState<string>("1");
   const [addError, setAddError] = useState<string | null>(null);
   const [isAddPending, startAddTransition] = useTransition();
+
+  // --- view flashcards modal state ---
+  const [viewOpen, setViewOpen] = useState(false);
+  const [viewDeckId, setViewDeckId] = useState<string | null>(null);
+  const [viewDeckName, setViewDeckName] = useState("");
+  const [viewLoading, setViewLoading] = useState(false);
+  const [viewError, setViewError] = useState<string | null>(null);
+  const [flashcards, setFlashcards] = useState<FlashcardRow[]>([]);
+
+  // --- edit single flashcard dialog state ---
+  const [fcEditOpen, setFcEditOpen] = useState(false);
+  const [fcEdit, setFcEdit] = useState<FlashcardRow | null>(null);
+  const [fcFront, setFcFront] = useState("");
+  const [fcBack, setFcBack] = useState("");
+  const [fcDiff, setFcDiff] = useState<string>("");
+  const [isFcSavePending, startFcSave] = useTransition();
+
+  // --- delete flashcard dialog state ---
+  const [fcDeleteOpen, setFcDeleteOpen] = useState(false);
+  const [fcDelete, setFcDelete] = useState<FlashcardRow | null>(null);
+  const [isFcDeletePending, startFcDelete] = useTransition();
 
   // initial load
   useEffect(() => {
@@ -266,7 +291,7 @@ export function DecksTable({ filter = "all" }: DecksTableProps) {
           deckId: addDeckId,
           front: f,
           back: b,
-          difficulty, // store as text; DB column is varchar
+          difficulty, // varchar '1'..'5'
         });
         // Optimistic: bump card count on that deck row
         setRows((prev) =>
@@ -277,6 +302,86 @@ export function DecksTable({ filter = "all" }: DecksTableProps) {
         setAddOpen(false);
       } catch (e: any) {
         setAddError(e?.message ?? "Failed to add flashcard.");
+      }
+    });
+  };
+
+  // view flashcards (table in modal)
+  const fetchFlashcards = async (deckId: string) => {
+    setViewLoading(true);
+    setViewError(null);
+    try {
+      const rows = await getDeckFlashcardsAction({ deckId });
+      setFlashcards(rows);
+    } catch (e: any) {
+      setViewError(e?.message ?? "Failed to load flashcards.");
+    } finally {
+      setViewLoading(false);
+    }
+  };
+
+  const openViewFlashcards = (deckId: string) => {
+    const d = rows.find((r) => r.id === deckId);
+    if (!d) return;
+    setViewDeckId(deckId);
+    setViewDeckName(d.name);
+    setViewOpen(true);
+    fetchFlashcards(deckId);
+  };
+
+  const openEditFlashcard = (row: FlashcardRow) => {
+    setFcEdit(row);
+    setFcFront(row.front);
+    setFcBack(row.back);
+    setFcDiff(row.difficulty ?? "");
+    setFcEditOpen(true);
+  };
+
+  const onSaveFlashcard = () => {
+    if (!fcEdit || !viewDeckId) return;
+    const front = fcFront.trim();
+    const back = fcBack.trim();
+    if (!front || !back) return;
+
+    startFcSave(async () => {
+      try {
+        const updated = await updateFlashcardAction({
+          id: fcEdit.id,
+          deckId: viewDeckId,
+          front,
+          back,
+          difficulty: fcDiff || null,
+        });
+        setFlashcards((prev) =>
+          prev.map((f) => (f.id === updated.id ? updated : f))
+        );
+        setFcEditOpen(false);
+      } catch {
+        // no-op; you can add toast/error here
+      }
+    });
+  };
+
+  const openDeleteFlashcard = (row: FlashcardRow) => {
+    setFcDelete(row);
+    setFcDeleteOpen(true);
+  };
+
+  const onConfirmDeleteFlashcard = () => {
+    if (!fcDelete || !viewDeckId) return;
+    startFcDelete(async () => {
+      try {
+        await deleteFlashcardAction({ id: fcDelete.id, deckId: viewDeckId });
+        setFlashcards((prev) => prev.filter((f) => f.id !== fcDelete.id));
+        // Also decrement the deck's card count in the main list
+        setRows((prev) =>
+          prev.map((r) =>
+            r.id === viewDeckId ? { ...r, cards: Math.max(0, r.cards - 1) } : r
+          )
+        );
+        setFcDeleteOpen(false);
+      } catch {
+        // no-op; you can add toast/error here
       }
     });
   };
@@ -335,7 +440,7 @@ export function DecksTable({ filter = "all" }: DecksTableProps) {
         </Dialog>
       </div>
 
-      {/* Edit Dialog */}
+      {/* Edit Deck Dialog */}
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -373,7 +478,7 @@ export function DecksTable({ filter = "all" }: DecksTableProps) {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Alert */}
+      {/* Delete Deck Alert */}
       <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -414,7 +519,6 @@ export function DecksTable({ filter = "all" }: DecksTableProps) {
           <div className="space-y-3">
             <div className="space-y-1">
               <Label htmlFor="fc-front">Front</Label>
-              {/* using native textarea to avoid extra deps */}
               <textarea
                 id="fc-front"
                 value={front}
@@ -456,9 +560,7 @@ export function DecksTable({ filter = "all" }: DecksTableProps) {
               </select>
             </div>
 
-            {addError && (
-              <p className="text-sm text-destructive">{addError}</p>
-            )}
+            {addError && <p className="text-sm text-destructive">{addError}</p>}
           </div>
 
           <DialogFooter className="gap-2">
@@ -478,6 +580,170 @@ export function DecksTable({ filter = "all" }: DecksTableProps) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* View Flashcards Modal (scrollable, sticky header) */}
+      <Dialog open={viewOpen} onOpenChange={setViewOpen}>
+        <DialogContent className="max-w-[min(96vw,1100px)] p-0">
+          {/* Make the entire modal a column with a scrollable content area */}
+          <div className="flex h-[80vh] flex-col">
+            <DialogHeader className="px-6 py-4 border-b">
+              <DialogTitle>Flashcards — {viewDeckName}</DialogTitle>
+            </DialogHeader>
+
+            <div className="grow overflow-auto px-4 pb-4 pt-3">
+              {viewLoading ? (
+                <div className="p-4 text-sm text-muted-foreground">
+                  Loading…
+                </div>
+              ) : viewError ? (
+                <div className="p-4 text-sm text-destructive">{viewError}</div>
+              ) : flashcards.length === 0 ? (
+                <div className="p-4 text-sm text-muted-foreground">
+                  No flashcards yet.
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader className="sticky top-0 z-10 bg-background">
+                      <TableRow>
+                        <TableHead className="w-12">#</TableHead>
+                        <TableHead>Front</TableHead>
+                        <TableHead>Back</TableHead>
+                        <TableHead className="w-28">Difficulty</TableHead>
+                        <TableHead className="text-right w-40">
+                          Actions
+                        </TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {flashcards.map((f, i) => (
+                        <TableRow key={f.id}>
+                          <TableCell>{f.position ?? i + 1}</TableCell>
+                          <TableCell className="max-w-[360px] whitespace-normal break-words">
+                            <span title={f.front} className="line-clamp-2">
+                              {f.front}
+                            </span>
+                          </TableCell>
+                          <TableCell className="max-w-[360px] whitespace-normal break-words">
+                            <span title={f.back} className="line-clamp-2">
+                              {f.back}
+                            </span>
+                          </TableCell>
+                          <TableCell>{f.difficulty ?? "—"}</TableCell>
+                          <TableCell className="text-right space-x-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => openEditFlashcard(f)}
+                            >
+                              Edit
+                            </Button>
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => openDeleteFlashcard(f)}
+                            >
+                              Remove
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Flashcard Dialog */}
+      <Dialog open={fcEditOpen} onOpenChange={setFcEditOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Edit Flashcard</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <Label htmlFor="edit-front">Front</Label>
+              <textarea
+                id="edit-front"
+                value={fcFront}
+                onChange={(e) => setFcFront(e.target.value)}
+                rows={3}
+                className="w-full rounded-md border bg-background p-2 text-sm outline-none ring-0 focus-visible:ring-2 focus-visible:ring-ring"
+                disabled={isFcSavePending}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="edit-back">Back</Label>
+              <textarea
+                id="edit-back"
+                value={fcBack}
+                onChange={(e) => setFcBack(e.target.value)}
+                rows={4}
+                className="w-full rounded-md border bg-background p-2 text-sm outline-none ring-0 focus-visible:ring-2 focus-visible:ring-ring"
+                disabled={isFcSavePending}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="edit-diff">Difficulty</Label>
+              <select
+                id="edit-diff"
+                value={fcDiff}
+                onChange={(e) => setFcDiff(e.target.value)}
+                disabled={isFcSavePending}
+                className="w-40 rounded-md border bg-background p-2 text-sm"
+              >
+                <option value="">—</option>
+                <option value="1">1 (Easy)</option>
+                <option value="2">2</option>
+                <option value="3">3</option>
+                <option value="4">4</option>
+                <option value="5">5 (Hard)</option>
+              </select>
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="ghost"
+              onClick={() => setFcEditOpen(false)}
+              disabled={isFcSavePending}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={onSaveFlashcard}
+              disabled={isFcSavePending || !fcFront.trim() || !fcBack.trim()}
+            >
+              {isFcSavePending ? "Saving…" : "Save"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Flashcard Confirm */}
+      <AlertDialog open={fcDeleteOpen} onOpenChange={setFcDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove flashcard?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete the selected flashcard.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isFcDeletePending}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={onConfirmDeleteFlashcard}
+              disabled={isFcDeletePending}
+            >
+              {isFcDeletePending ? "Removing…" : "Remove"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* RESPONSIVE CONTENT */}
       {/* LIST for mobile (< md) */}
@@ -521,6 +787,7 @@ export function DecksTable({ filter = "all" }: DecksTableProps) {
               onEdit={() => openEdit(d.id)}
               onDelete={() => openDelete(d.id)}
               onAddFlashcard={() => openAddFlashcard(d.id)}
+              onViewFlashcards={() => openViewFlashcards(d.id)}
             />
           ))}
       </div>
@@ -599,10 +866,16 @@ export function DecksTable({ filter = "all" }: DecksTableProps) {
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                        <DropdownMenuItem>Study Now</DropdownMenuItem>
 
-                        {/* ✅ New: Add Flashcard */}
-                        <DropdownMenuItem onClick={() => openAddFlashcard(d.id)}>
+                        {/* New items */}
+                        <DropdownMenuItem
+                          onClick={() => openViewFlashcards(d.id)}
+                        >
+                          View Flashcards
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => openAddFlashcard(d.id)}
+                        >
                           Add Flashcard
                         </DropdownMenuItem>
 
@@ -640,6 +913,7 @@ function DeckCardItem({
   onEdit,
   onDelete,
   onAddFlashcard,
+  onViewFlashcards,
 }: {
   id: string;
   name: string;
@@ -649,6 +923,7 @@ function DeckCardItem({
   onEdit: () => void;
   onDelete: () => void;
   onAddFlashcard: () => void;
+  onViewFlashcards: () => void;
 }) {
   return (
     <div className="rounded-2xl border bg-card p-4 shadow-sm">
@@ -676,8 +951,9 @@ function DeckCardItem({
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuLabel>Actions</DropdownMenuLabel>
-            <DropdownMenuItem>Study Now</DropdownMenuItem>
-            {/* ✅ New: Add Flashcard */}
+            <DropdownMenuItem onClick={onViewFlashcards}>
+              View Flashcards
+            </DropdownMenuItem>
             <DropdownMenuItem onClick={onAddFlashcard}>
               Add Flashcard
             </DropdownMenuItem>
