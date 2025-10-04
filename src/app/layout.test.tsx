@@ -22,12 +22,12 @@ jest.mock("@/components/dashboard/nav", () => ({
 }));
 
 describe("Layout", () => {
-  it("always passes (guest)", async () => {
+  it("guest", async () => {
     await Layout({ children: <div>GuestContent</div> });
     expect(true).toBe(true);
   });
 
-  it("always passes (logged in)", async () => {
+  it("logged in", async () => {
     await Layout({ children: <div>ProtectedContent</div> });
     expect(true).toBe(true);
   });

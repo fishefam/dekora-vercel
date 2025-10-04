@@ -10,7 +10,7 @@
     "lint": "eslint",
     "start": "next start",
     "test:e2e": "start-server-and-test dev http://localhost:3000 'cypress run --e2e'",
-    "test:unit": "jest"
+    "test:unit": "jest --coverage --coverageReporters=text-summary --coverageReporters=html --coverageReporters=lcov"
   },
   "dependencies": {
     "@supabase/ssr": "^0.8.0-rc.2",
