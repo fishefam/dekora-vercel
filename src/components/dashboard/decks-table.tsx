@@ -2,30 +2,50 @@
 "use client";
 
 import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { MoreHorizontal } from "@/components/icons";
 import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
-  DropdownMenuSeparator, DropdownMenuTrigger,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
 } from "@/components/ui/dialog";
 import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
-  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import {
   getDecksAction,
   createDeckAction,
   updateDeckAction,
   getCategoriesAction,
-  createCategoryAction, // <- NEW
+  createCategoryAction,
   type DeckRow as DeckRowServer,
   type CategoryRow,
   createFlashcardAction,
@@ -55,7 +75,9 @@ export function DecksTable({ filter = "all" }: DecksTableProps) {
   const [loadError, setLoadError] = useState<string | null>(null);
 
   // --- categories state ---
-  const [categories, setCategories] = useState<Pick<CategoryRow, "id" | "name">[]>([]);
+  const [categories, setCategories] = useState<
+    Pick<CategoryRow, "id" | "name">[]
+  >([]);
   const [catsError, setCatsError] = useState<string | null>(null);
   const [catsLoading, setCatsLoading] = useState<boolean>(false);
 
@@ -247,9 +269,13 @@ export function DecksTable({ filter = "all" }: DecksTableProps) {
     if (!editId) return;
 
     const prev = rows;
-    setRows(prev.map((r) =>
-      r.id === editId ? { ...r, name: newName, category_id: newCategoryId } : r
-    ));
+    setRows(
+      prev.map((r) =>
+        r.id === editId
+          ? { ...r, name: newName, category_id: newCategoryId }
+          : r
+      )
+    );
 
     startEditTransition(async () => {
       try {
@@ -446,7 +472,9 @@ export function DecksTable({ filter = "all" }: DecksTableProps) {
           {/* NEW CATEGORY button */}
           <Dialog open={catOpen} onOpenChange={setCatOpen}>
             <DialogTrigger asChild>
-              <Button variant="outline" className="h-8">New Category</Button>
+              <Button variant="outline" className="h-8">
+                New Category
+              </Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-md">
               <DialogHeader>
@@ -475,7 +503,9 @@ export function DecksTable({ filter = "all" }: DecksTableProps) {
                     disabled={isCatPending}
                   />
                 </div>
-                {catError && <p className="text-sm text-destructive">{catError}</p>}
+                {catError && (
+                  <p className="text-sm text-destructive">{catError}</p>
+                )}
               </div>
               <DialogFooter className="gap-2">
                 <Button
@@ -736,11 +766,15 @@ export function DecksTable({ filter = "all" }: DecksTableProps) {
 
             <div className="grow overflow-auto px-4 pb-4 pt-3">
               {viewLoading ? (
-                <div className="p-4 text-sm text-muted-foreground">Loading…</div>
+                <div className="p-4 text-sm text-muted-foreground">
+                  Loading…
+                </div>
               ) : viewError ? (
                 <div className="p-4 text-sm text-destructive">{viewError}</div>
               ) : flashcards.length === 0 ? (
-                <div className="p-4 text-sm text-muted-foreground">No flashcards yet.</div>
+                <div className="p-4 text-sm text-muted-foreground">
+                  No flashcards yet.
+                </div>
               ) : (
                 <div className="overflow-x-auto">
                   <Table>
@@ -750,7 +784,9 @@ export function DecksTable({ filter = "all" }: DecksTableProps) {
                         <TableHead>Front</TableHead>
                         <TableHead>Back</TableHead>
                         <TableHead className="w-28">Difficulty</TableHead>
-                        <TableHead className="text-right w-40">Actions</TableHead>
+                        <TableHead className="text-right w-40">
+                          Actions
+                        </TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -758,17 +794,29 @@ export function DecksTable({ filter = "all" }: DecksTableProps) {
                         <TableRow key={f.id}>
                           <TableCell>{f.position ?? i + 1}</TableCell>
                           <TableCell className="max-w-[360px] whitespace-normal break-words">
-                            <span title={f.front} className="line-clamp-2">{f.front}</span>
+                            <span title={f.front} className="line-clamp-2">
+                              {f.front}
+                            </span>
                           </TableCell>
                           <TableCell className="max-w-[360px] whitespace-normal break-words">
-                            <span title={f.back} className="line-clamp-2">{f.back}</span>
+                            <span title={f.back} className="line-clamp-2">
+                              {f.back}
+                            </span>
                           </TableCell>
                           <TableCell>{f.difficulty ?? "—"}</TableCell>
                           <TableCell className="text-right space-x-2">
-                            <Button variant="outline" size="sm" onClick={() => openEditFlashcard(f)}>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => openEditFlashcard(f)}
+                            >
                               Edit
                             </Button>
-                            <Button variant="destructive" size="sm" onClick={() => openDeleteFlashcard(f)}>
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => openDeleteFlashcard(f)}
+                            >
                               Remove
                             </Button>
                           </TableCell>
@@ -831,10 +879,17 @@ export function DecksTable({ filter = "all" }: DecksTableProps) {
             </div>
           </div>
           <DialogFooter className="gap-2">
-            <Button variant="ghost" onClick={() => setFcEditOpen(false)} disabled={isFcSavePending}>
+            <Button
+              variant="ghost"
+              onClick={() => setFcEditOpen(false)}
+              disabled={isFcSavePending}
+            >
               Cancel
             </Button>
-            <Button onClick={onSaveFlashcard} disabled={isFcSavePending || !fcFront.trim() || !fcBack.trim()}>
+            <Button
+              onClick={onSaveFlashcard}
+              disabled={isFcSavePending || !fcFront.trim() || !fcBack.trim()}
+            >
               {isFcSavePending ? "Saving…" : "Save"}
             </Button>
           </DialogFooter>
@@ -851,8 +906,13 @@ export function DecksTable({ filter = "all" }: DecksTableProps) {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={isFcDeletePending}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={onConfirmDeleteFlashcard} disabled={isFcDeletePending}>
+            <AlertDialogCancel disabled={isFcDeletePending}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={onConfirmDeleteFlashcard}
+              disabled={isFcDeletePending}
+            >
               {isFcDeletePending ? "Removing…" : "Remove"}
             </AlertDialogAction>
           </AlertDialogFooter>
@@ -864,7 +924,10 @@ export function DecksTable({ filter = "all" }: DecksTableProps) {
       <div className="md:hidden space-y-3 mx-5">
         {isLoading &&
           Array.from({ length: 4 }).map((_, i) => (
-            <div key={`sk-m-${i}`} className="rounded-2xl border bg-card p-4 shadow-sm">
+            <div
+              key={`sk-m-${i}`}
+              className="rounded-2xl border bg-card p-4 shadow-sm"
+            >
               <div className="h-5 w-40 animate-pulse rounded bg-muted" />
               <div className="mt-3 flex items-center gap-3 text-sm text-muted-foreground">
                 <div className="h-4 w-24 animate-pulse rounded bg-muted" />
@@ -885,20 +948,22 @@ export function DecksTable({ filter = "all" }: DecksTableProps) {
           </div>
         )}
 
-        {!isLoading && !loadError && decks.map((d) => (
-          <DeckCardItem
-            key={d.id}
-            id={d.id}
-            name={d.name}
-            cards={d.cards}
-            lastStudied={d.lastStudied}
-            created={d.created}
-            onEdit={() => openEdit(d.id)}
-            onDelete={() => openDelete(d.id)}
-            onAddFlashcard={() => openAddFlashcard(d.id)}
-            onViewFlashcards={() => openViewFlashcards(d.id)}
-          />
-        ))}
+        {!isLoading &&
+          !loadError &&
+          decks.map((d) => (
+            <DeckCardItem
+              key={d.id}
+              id={d.id}
+              name={d.name}
+              cards={d.cards}
+              lastStudied={d.lastStudied}
+              created={d.created}
+              onEdit={() => openEdit(d.id)}
+              onDelete={() => openDelete(d.id)}
+              onAddFlashcard={() => openAddFlashcard(d.id)}
+              onViewFlashcards={() => openViewFlashcards(d.id)}
+            />
+          ))}
       </div>
 
       {/* TABLE for desktop (≥ md) */}
@@ -917,17 +982,30 @@ export function DecksTable({ filter = "all" }: DecksTableProps) {
             {isLoading &&
               Array.from({ length: 6 }).map((_, i) => (
                 <TableRow key={`sk-${i}`}>
-                  <TableCell><div className="h-4 w-44 animate-pulse rounded bg-muted" /></TableCell>
-                  <TableCell><div className="h-4 w-10 animate-pulse rounded bg-muted" /></TableCell>
-                  <TableCell><div className="h-4 w-24 animate-pulse rounded bg-muted" /></TableCell>
-                  <TableCell><div className="h-4 w-24 animate-pulse rounded bg-muted" /></TableCell>
-                  <TableCell className="text-right"><div className="h-4 ml-auto w-8 animate-pulse rounded bg-muted" /></TableCell>
+                  <TableCell>
+                    <div className="h-4 w-44 animate-pulse rounded bg-muted" />
+                  </TableCell>
+                  <TableCell>
+                    <div className="h-4 w-10 animate-pulse rounded bg-muted" />
+                  </TableCell>
+                  <TableCell>
+                    <div className="h-4 w-24 animate-pulse rounded bg-muted" />
+                  </TableCell>
+                  <TableCell>
+                    <div className="h-4 w-24 animate-pulse rounded bg-muted" />
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="h-4 ml-auto w-8 animate-pulse rounded bg-muted" />
+                  </TableCell>
                 </TableRow>
               ))}
 
             {!isLoading && loadError && (
               <TableRow>
-                <TableCell colSpan={5} className="text-center text-sm text-destructive">
+                <TableCell
+                  colSpan={5}
+                  className="text-center text-sm text-destructive"
+                >
                   {loadError}
                 </TableCell>
               </TableRow>
@@ -935,42 +1013,60 @@ export function DecksTable({ filter = "all" }: DecksTableProps) {
 
             {!isLoading && !loadError && decks.length === 0 && (
               <TableRow>
-                <TableCell colSpan={5} className="text-center text-sm text-muted-foreground">
+                <TableCell
+                  colSpan={5}
+                  className="text-center text-sm text-muted-foreground"
+                >
                   No decks found.
                 </TableCell>
               </TableRow>
             )}
 
-            {!isLoading && !loadError && decks.map((d) => (
-              <TableRow key={d.id}>
-                <TableCell className="font-medium">{d.name}</TableCell>
-                <TableCell>{d.cards}</TableCell>
-                <TableCell>{d.lastStudied}</TableCell>
-                <TableCell>{d.created}</TableCell>
-                <TableCell className="text-right">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" className="h-8 w-8 p-0">
-                        <span className="sr-only">Open menu</span>
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                      <DropdownMenuItem onClick={() => openViewFlashcards(d.id)}>View Flashcards</DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => openAddFlashcard(d.id)}>Add Flashcard</DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => openEdit(d.id)}>Edit Deck</DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem>Export Deck</DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem className="text-destructive" onClick={() => openDelete(d.id)}>
-                        Delete Deck
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </TableCell>
-              </TableRow>
-            ))}
+            {!isLoading &&
+              !loadError &&
+              decks.map((d) => (
+                <TableRow key={d.id}>
+                  <TableCell className="font-medium">{d.name}</TableCell>
+                  <TableCell>{d.cards}</TableCell>
+                  <TableCell>{d.lastStudied}</TableCell>
+                  <TableCell>{d.created}</TableCell>
+                  <TableCell className="text-right">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" className="h-8 w-8 p-0">
+                          <span className="sr-only">Open menu</span>
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                        <DropdownMenuItem
+                          onClick={() => openViewFlashcards(d.id)}
+                        >
+                          View Flashcards
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => openAddFlashcard(d.id)}
+                        >
+                          Add Flashcard
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => openEdit(d.id)}>
+                          Edit Deck
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem>Export Deck</DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          className="text-destructive"
+                          onClick={() => openDelete(d.id)}
+                        >
+                          Delete Deck
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
+                </TableRow>
+              ))}
           </TableBody>
         </Table>
       </div>
@@ -980,7 +1076,15 @@ export function DecksTable({ filter = "all" }: DecksTableProps) {
 
 /* Mobile/desktop “list” card item */
 function DeckCardItem({
-  id, name, cards, lastStudied, created, onEdit, onDelete, onAddFlashcard, onViewFlashcards,
+  id,
+  name,
+  cards,
+  lastStudied,
+  created,
+  onEdit,
+  onDelete,
+  onAddFlashcard,
+  onViewFlashcards,
 }: {
   id: string;
   name: string;
@@ -1018,13 +1122,19 @@ function DeckCardItem({
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuLabel>Actions</DropdownMenuLabel>
-            <DropdownMenuItem onClick={onViewFlashcards}>View Flashcards</DropdownMenuItem>
-            <DropdownMenuItem onClick={onAddFlashcard}>Add Flashcard</DropdownMenuItem>
+            <DropdownMenuItem onClick={onViewFlashcards}>
+              View Flashcards
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={onAddFlashcard}>
+              Add Flashcard
+            </DropdownMenuItem>
             <DropdownMenuItem onClick={onEdit}>Edit Deck</DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem>Export Deck</DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="text-destructive" onClick={onDelete}>Delete Deck</DropdownMenuItem>
+            <DropdownMenuItem className="text-destructive" onClick={onDelete}>
+              Delete Deck
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
