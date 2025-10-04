@@ -20,6 +20,8 @@
     "radix-ui": "^1.4.3"
   },
   "devDependencies": {
+    "cypress": "^15.3.0",
+    "jest": "^30.2.0",
     "typescript": "5.9.2"
   }
 }
