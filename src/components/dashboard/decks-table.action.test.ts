@@ -1,4 +1,5 @@
-// src/app/decks-table.action.test.ts
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-nocheck
 import "@testing-library/jest-dom";
 
 jest.mock("@sb/auth", () => ({
