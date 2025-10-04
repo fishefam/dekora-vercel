@@ -62,7 +62,7 @@ import {
   updateUserStatusAction,
   deleteUserAction,
   type AdminUser,
-} from "./page.action";
+} from "./action";
 
 export default function Page() {
   // table data
