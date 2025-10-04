@@ -1,3 +1,5 @@
+import "@testing-library/jest-dom";
+
 import { render } from "@testing-library/react";
 import { ProgressStats } from "./progress-stats";
 

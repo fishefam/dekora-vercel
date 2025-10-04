@@ -1,4 +1,5 @@
-// src/components/dashboard/flashcard.test.tsx
+import "@testing-library/jest-dom";
+
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Flashcard } from "./flashcard";
