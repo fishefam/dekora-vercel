@@ -89,7 +89,6 @@ export default function Page() {
           // make sure your component reads these keys:
           // total_decks, total_cards, total_minutes, retention_rate
           // (plus it can still use streaks/last_studied_at if it wants)
-          // @ts-expect-error: adjust in your component types if needed
           stats={
             summary ?? {
               total_sessions: 0,
