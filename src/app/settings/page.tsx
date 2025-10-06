@@ -12,35 +12,23 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Laptop, Moon, Save, Sun } from "lucide-react";
+import { Laptop, Moon, Sun } from "lucide-react";
 
-export default function SettingsPage() {
+export default function Page() {
   return (
     <DashboardShell>
       <DashboardHeader
         heading="Settings"
         text="Manage your account settings and preferences."
-      >
-        <Button>
-          <Save className="mr-2 h-4 w-4" />
-          Save Changes
-        </Button>
-      </DashboardHeader>
+      ></DashboardHeader>
 
       <Tabs defaultValue="preferences" className="space-y-4">
         <TabsList>
-          <TabsTrigger value="preferences">Study Preferences</TabsTrigger>
+          <TabsTrigger value="preferences">Preferences</TabsTrigger>
           <TabsTrigger value="appearance">Appearance</TabsTrigger>
           <TabsTrigger value="account">Account</TabsTrigger>
         </TabsList>
@@ -56,7 +44,7 @@ export default function SettingsPage() {
             <CardContent className="space-y-6">
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label>Default Study Mode</Label>
+                  <Label>Default Review Tab</Label>
                   <RadioGroup defaultValue="cards">
                     <div className="flex items-center space-x-2">
                       <RadioGroupItem value="cards" id="mode-cards" />
@@ -66,52 +54,7 @@ export default function SettingsPage() {
                       <RadioGroupItem value="quiz" id="mode-quiz" />
                       <Label htmlFor="mode-quiz">Quiz Mode</Label>
                     </div>
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="match" id="mode-match" />
-                      <Label htmlFor="mode-match">Matching Game</Label>
-                    </div>
                   </RadioGroup>
-                </div>
-
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="card-order">Card Order</Label>
-                  </div>
-                  <Select defaultValue="random">
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select card order" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="sequential">Sequential</SelectItem>
-                      <SelectItem value="random">Random</SelectItem>
-                      <SelectItem value="difficulty">By Difficulty</SelectItem>
-                      <SelectItem value="least-studied">
-                        Least Studied First
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="review-interval">
-                      Review Interval (days)
-                    </Label>
-                    <span className="text-sm text-muted-foreground">
-                      3 days
-                    </span>
-                  </div>
-                  <Slider
-                    id="review-interval"
-                    defaultValue={[3]}
-                    max={14}
-                    min={1}
-                    step={1}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Cards will be scheduled for review after the selected number
-                    of days.
-                  </p>
                 </div>
 
                 <Separator />
@@ -132,22 +75,6 @@ export default function SettingsPage() {
                         <Switch id="audio-feedback" defaultChecked />
                         <Label htmlFor="audio-feedback">
                           Play sound on correct/incorrect answers
-                        </Label>
-                      </div>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-2">
-                        <Switch id="show-progress" defaultChecked />
-                        <Label htmlFor="show-progress">
-                          Show progress during study sessions
-                        </Label>
-                      </div>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-2">
-                        <Switch id="skip-mastered" />
-                        <Label htmlFor="skip-mastered">
-                          Skip mastered cards in review
                         </Label>
                       </div>
                     </div>
@@ -290,7 +217,11 @@ export default function SettingsPage() {
 
                 <div className="space-y-2">
                   <Label htmlFor="email">Email</Label>
-                  <Input id="email" defaultValue="john.doe@example.com" />
+                  <Input
+                    id="email"
+                    disabled
+                    defaultValue="john.doe@example.com"
+                  />
                 </div>
 
                 <Separator />
@@ -304,7 +235,7 @@ export default function SettingsPage() {
               </div>
             </CardContent>
             <CardFooter>
-              <Button className="w-full">Save Account Changes</Button>
+              <Button className="w-full">Save</Button>
             </CardFooter>
           </Card>
         </TabsContent>
