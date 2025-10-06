@@ -10,6 +10,7 @@ import {
   BookOpen,
   BookOpenCheck,
   BarChart3,
+  Settings,
   Download,
   Upload,
   ShieldUser,
@@ -47,6 +48,11 @@ const navItems: NavItem[] = [
     title: "Export",
     href: "/export",
     icon: Download,
+  },
+  {
+    title: "Settings",
+    href: "/settings",
+    icon: Settings,
   },
   {
     title: "Administrator",
