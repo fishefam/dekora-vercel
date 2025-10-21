@@ -21,11 +21,28 @@ import {
   setDefaultReviewTabAction,
   setThemeAction,
   setCardStyleAction,
+  getAccountNamesAction,
+  updateAccountNamesAction,
 } from "./page.action";
 import { useEffect, useState, useTransition } from "react";
 
 export default function Page() {
-  const [, startTransition] = useTransition();
+  const [isPending, startTransition] = useTransition();
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [accountEmail, setAccountEmail] = useState<string | null>(
+    ""
+  );
+
+  useEffect(() => {
+    startTransition(async () => {
+      const { firstName, lastName, email } = await getAccountNamesAction();
+      console.log(firstName, lastName, email);
+      if (firstName) setFirstName(firstName);
+      if (lastName) setLastName(lastName);
+      if (email !== undefined) setAccountEmail(email);
+    });
+  }, []);
 
   // --- cookie helpers (client-side, mirrors your review tab example) ---
   const getCookie = (name: string) =>
@@ -116,11 +133,19 @@ export default function Page() {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="first-name">First name</Label>
-                    <Input id="first-name" defaultValue="John" />
+                    <Input
+                      id="first-name"
+                      value={firstName}
+                      onChange={(e) => setFirstName(e.target.value)}
+                    />{" "}
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="last-name">Last name</Label>
-                    <Input id="last-name" defaultValue="Doe" />
+                    <Input
+                      id="last-name"
+                      value={lastName}
+                      onChange={(e) => setLastName(e.target.value)}
+                    />{" "}
                   </div>
                 </div>
 
@@ -129,7 +154,7 @@ export default function Page() {
                   <Input
                     id="email"
                     disabled
-                    defaultValue="john.doe@example.com"
+                    defaultValue={accountEmail ?? ""}
                   />
                 </div>
 
@@ -144,7 +169,20 @@ export default function Page() {
               </div>
             </CardContent>
             <CardFooter>
-              <Button className="w-full">Save</Button>
+              <Button
+                className="w-full"
+                onClick={() =>
+                  startTransition(async () => {
+                    const res = await updateAccountNamesAction(
+                      firstName,
+                      lastName
+                    );
+                    console.log(res.message);
+                  })
+                }
+              >
+                {isPending ? "Saving..." : "Save"}
+              </Button>
             </CardFooter>
           </Card>
         </TabsContent>
