@@ -23,16 +23,24 @@ import {
   setCardStyleAction,
   getAccountNamesAction,
   updateAccountNamesAction,
+  changePasswordAction,
 } from "./page.action";
 import { useEffect, useState, useTransition } from "react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 
 export default function Page() {
   const [isPending, startTransition] = useTransition();
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
-  const [accountEmail, setAccountEmail] = useState<string | null>(
-    ""
-  );
+  const [accountEmail, setAccountEmail] = useState<string | null>("");
 
   useEffect(() => {
     startTransition(async () => {
@@ -162,9 +170,11 @@ export default function Page() {
 
                 <div className="space-y-2">
                   <Label>Password</Label>
-                  <Button variant="outline" className="w-full">
-                    Change Password
-                  </Button>
+                  <ChangePasswordDialog asChild>
+                    <Button variant="outline" className="w-full">
+                      Change Password
+                    </Button>
+                  </ChangePasswordDialog>
                 </div>
               </div>
             </CardContent>
@@ -298,5 +308,88 @@ function AppearanceSection() {
         </RadioGroup>
       </div>
     </div>
+  );
+}
+
+function ChangePasswordDialog(
+  props: React.PropsWithChildren<{ asChild?: boolean }>
+) {
+  const [open, setOpen] = useState(false);
+  const [isPending, startTransition] = useTransition();
+  const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [doneMsg, setDoneMsg] = useState<string | null>(null);
+
+  const onSubmit = () => {
+    setError(null);
+    setDoneMsg(null);
+    startTransition(async () => {
+      const res = await changePasswordAction(password, confirm);
+      if (!res.ok) {
+        setError(res.message);
+        return;
+      }
+      setDoneMsg("Password updated.");
+      // optional: close after a short delay
+      setTimeout(() => setOpen(false), 600);
+      setPassword("");
+      setConfirm("");
+    });
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild={props.asChild}>{props.children}</DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Change Password</DialogTitle>
+          <DialogDescription>
+            Enter a new password (minimum 8 characters).
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="grid gap-4 py-2">
+          <div className="grid gap-2">
+            <Label htmlFor="new-password">New password</Label>
+            <Input
+              id="new-password"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              minLength={8}
+              placeholder="••••••••"
+            />
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="confirm-password">Confirm password</Label>
+            <Input
+              id="confirm-password"
+              type="password"
+              value={confirm}
+              onChange={(e) => setConfirm(e.target.value)}
+              minLength={8}
+              placeholder="••••••••"
+            />
+          </div>
+
+          {error && <p className="text-sm text-red-600">{error}</p>}
+          {doneMsg && <p className="text-sm text-green-600">{doneMsg}</p>}
+        </div>
+
+        <DialogFooter>
+          <Button
+            variant="outline"
+            onClick={() => setOpen(false)}
+            disabled={isPending}
+          >
+            Cancel
+          </Button>
+          <Button onClick={onSubmit} disabled={isPending}>
+            {isPending ? "Saving..." : "Update Password"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

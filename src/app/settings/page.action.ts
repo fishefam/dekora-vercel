@@ -137,3 +137,51 @@ export async function updateAccountNamesAction(
     return { ok: false, message: "Something went wrong." };
   }
 }
+
+export async function changePasswordAction(
+  newPassword: string,
+  confirmPassword: string
+): Promise<{
+  ok: boolean;
+  message: string;
+  fieldErrors?: Record<string, string>;
+}> {
+  const fieldErrors: Record<string, string> = {};
+
+  if (!newPassword || newPassword.length < 8) {
+    fieldErrors.password = "Minimum 8 characters.";
+  }
+  if (newPassword !== confirmPassword) {
+    fieldErrors.confirm = "Passwords do not match.";
+  }
+  if (Object.keys(fieldErrors).length) {
+    return {
+      ok: false,
+      message: "Please fix the errors and try again.",
+      fieldErrors,
+    };
+  }
+
+  const supabase = await createClient();
+  const id = await getUserIdFromCookie();
+  const { data: auth, error: authErr } = await supabase.auth.admin.getUserById(
+    id ?? ""
+  );
+  if (authErr || !auth?.user) {
+    return { ok: false, message: "Not authenticated." };
+  }
+
+  const { error } = await supabase.auth.admin.updateUserById(id ?? "", {
+    password: newPassword,
+  });
+  if (error) {
+    return {
+      ok: false,
+      message: error.message || "Could not update password.",
+    };
+  }
+
+  // If your settings page is at /settings, revalidate it
+  revalidatePath("/settings");
+  return { ok: true, message: "Password updated." };
+}
