@@ -15,12 +15,29 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Separator } from "@/components/ui/separator";
-import { Slider } from "@/components/ui/slider";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Laptop, Moon, Sun } from "lucide-react";
-import { setDefaultReviewTabAction } from "./page.action";
+import { Moon, Sun } from "lucide-react";
+import {
+  setDefaultReviewTabAction,
+  setThemeAction,
+  setCardStyleAction,
+} from "./page.action";
+import { useEffect, useState, useTransition } from "react";
 
 export default function Page() {
+  const [, startTransition] = useTransition();
+
+  // --- cookie helpers (client-side, mirrors your review tab example) ---
+  const getCookie = (name: string) =>
+    typeof document === "undefined"
+      ? undefined
+      : document.cookie
+          .split("; ")
+          .find((v) => v.startsWith(name + "="))
+          ?.split("=")?.[1];
+
+  const defaultReviewTab = getCookie("default_review_tab") ?? "cards";
+
   return (
     <DashboardShell>
       <DashboardHeader
@@ -49,14 +66,11 @@ export default function Page() {
                   <Label>Default Review Tab</Label>
 
                   <RadioGroup
-                    defaultValue={
-                      document.cookie
-                        .split("; ")
-                        ?.find((v) => v?.includes("default_review_tab"))
-                        ?.split("=")?.[1] ?? "cards"
-                    }
-                    onValueChange={async (v) => {
-                      await setDefaultReviewTabAction(v);
+                    defaultValue={defaultReviewTab}
+                    onValueChange={(v) => {
+                      startTransition(async () => {
+                        await setDefaultReviewTabAction(v);
+                      });
                     }}
                   >
                     <div className="flex items-center space-x-2">
@@ -74,6 +88,7 @@ export default function Page() {
           </Card>
         </TabsContent>
 
+        {/* ---------------- Appearance (wired to cookie-backed actions) ---------------- */}
         <TabsContent value="appearance" className="space-y-4">
           <Card>
             <CardHeader>
@@ -83,102 +98,7 @@ export default function Page() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label>Theme</Label>
-                  <div className="grid grid-cols-3 gap-2">
-                    <div className="flex flex-col items-center space-y-2">
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        className="h-10 w-10"
-                      >
-                        <Sun className="h-5 w-5" />
-                        <span className="sr-only">Light</span>
-                      </Button>
-                      <span className="text-xs">Light</span>
-                    </div>
-                    <div className="flex flex-col items-center space-y-2">
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        className="h-10 w-10"
-                      >
-                        <Moon className="h-5 w-5" />
-                        <span className="sr-only">Dark</span>
-                      </Button>
-                      <span className="text-xs">Dark</span>
-                    </div>
-                    <div className="flex flex-col items-center space-y-2">
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        className="h-10 w-10"
-                      >
-                        <Laptop className="h-5 w-5" />
-                        <span className="sr-only">System</span>
-                      </Button>
-                      <span className="text-xs">System</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Card Appearance</Label>
-                  <RadioGroup defaultValue="standard">
-                    <div className="grid grid-cols-3 gap-4">
-                      <div className="flex flex-col items-center space-y-2">
-                        <div className="flex aspect-[3/2] w-full items-center justify-center rounded-md border p-2">
-                          <div className="flex h-full w-full items-center justify-center rounded-sm bg-muted">
-                            <span className="text-xs">Standard</span>
-                          </div>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="standard" id="card-standard" />
-                          <Label htmlFor="card-standard">Standard</Label>
-                        </div>
-                      </div>
-                      <div className="flex flex-col items-center space-y-2">
-                        <div className="flex aspect-[3/2] w-full items-center justify-center rounded-md border p-2">
-                          <div className="flex h-full w-full items-center justify-center rounded-lg bg-muted">
-                            <span className="text-xs">Rounded</span>
-                          </div>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="rounded" id="card-rounded" />
-                          <Label htmlFor="card-rounded">Rounded</Label>
-                        </div>
-                      </div>
-                      <div className="flex flex-col items-center space-y-2">
-                        <div className="flex aspect-[3/2] w-full items-center justify-center rounded-md border p-2">
-                          <div className="flex h-full w-full items-center justify-center bg-muted shadow-md">
-                            <span className="text-xs">Elevated</span>
-                          </div>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="elevated" id="card-elevated" />
-                          <Label htmlFor="card-elevated">Elevated</Label>
-                        </div>
-                      </div>
-                    </div>
-                  </RadioGroup>
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Font Size</Label>
-                  <div className="flex items-center space-x-2">
-                    <span className="text-sm">A</span>
-                    <Slider
-                      defaultValue={[16]}
-                      max={24}
-                      min={12}
-                      step={1}
-                      className="flex-1"
-                    />
-                    <span className="text-lg">A</span>
-                  </div>
-                </div>
-              </div>
+              <AppearanceSection />
             </CardContent>
           </Card>
         </TabsContent>
@@ -230,5 +150,115 @@ export default function Page() {
         </TabsContent>
       </Tabs>
     </DashboardShell>
+  );
+}
+
+function AppearanceSection() {
+  const [, startTransition] = useTransition();
+
+  // read cookies once on mount
+  const getCookie = (name: string) =>
+    typeof document === "undefined"
+      ? undefined
+      : document.cookie
+          .split("; ")
+          .find((v) => v.startsWith(name + "="))
+          ?.split("=")?.[1];
+
+  const [theme, setTheme] = useState(getCookie("theme") ?? "system");
+  const [cardStyle, setCardStyle] = useState(
+    getCookie("card_style") ?? "standard"
+  );
+
+  // optional: sync when cookie changes externally
+  useEffect(() => {
+    setTheme(getCookie("theme") ?? "system");
+  }, []);
+
+  const handleTheme = (value: "light" | "dark" | "system") => {
+    setTheme(value);
+    startTransition(async () => {
+      await setThemeAction(value);
+    });
+    document.documentElement.classList.remove("dark", "light");
+    document.documentElement.classList.add(value);
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="space-y-2">
+        <Label>Theme</Label>
+        <div className="grid grid-cols-3 gap-2">
+          {/* Light */}
+          <div className="flex flex-col items-center space-y-2">
+            <Button
+              variant={theme === "light" ? "default" : "outline"}
+              size="icon"
+              className="h-10 w-10 transition"
+              onClick={() => handleTheme("light")}
+            >
+              <Sun className="h-5 w-5" />
+              <span className="sr-only">Light</span>
+            </Button>
+            <span className="text-xs">Light</span>
+          </div>
+
+          {/* Dark */}
+          <div className="flex flex-col items-center space-y-2">
+            <Button
+              variant={theme === "dark" ? "default" : "outline"}
+              size="icon"
+              className="h-10 w-10 transition"
+              onClick={() => handleTheme("dark")}
+            >
+              <Moon className="h-5 w-5" />
+              <span className="sr-only">Dark</span>
+            </Button>
+            <span className="text-xs">Dark</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <Label>Card Appearance</Label>
+        <RadioGroup
+          defaultValue={cardStyle}
+          onValueChange={(v) =>
+            startTransition(async () => {
+              setCardStyle(v);
+              await setCardStyleAction(
+                v as "standard" | "rounded" | "elevated"
+              );
+            })
+          }
+        >
+          <div className="grid grid-cols-3 gap-4">
+            {["standard", "rounded"].map((style) => (
+              <div key={style} className="flex flex-col items-center space-y-2">
+                <div
+                  className={`flex aspect-[3/2] w-full items-center justify-center rounded-lg border p-2 ${
+                    cardStyle === style
+                      ? "ring-2 ring-primary border-primary"
+                      : ""
+                  } ${style === "standard" ? "!rounded-none" : ""} ${
+                    style === "elevated" ? "!shadow-2xs" : ""
+                  }`}
+                >
+                  <div className="flex h-full w-full items-center justify-center bg-muted rounded-sm">
+                    <span className="text-xs capitalize">{style}</span>
+                  </div>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value={style} id={`card-${style}`} />
+                  <Label htmlFor={`card-${style}`} className="capitalize">
+                    {style}
+                  </Label>
+                </div>
+              </div>
+            ))}
+          </div>
+        </RadioGroup>
+      </div>
+    </div>
   );
 }

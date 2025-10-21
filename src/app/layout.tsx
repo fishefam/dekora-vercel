@@ -43,7 +43,7 @@ export default async function Layout({
   const isLoggedin = parsed.success;
 
   return (
-    <html lang="en">
+    <html lang="en" className={cookieStore.get("theme")?.value ?? "light"}>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased relative flex h-screen flex-col md:px-0 [&>*]:px-3 justify-between`}
       >

@@ -560,7 +560,16 @@ export default function Page() {
 
         {/* QUIZ */}
         <TabsContent value="quiz" className="space-y-4">
-          <Card>
+          <Card
+            className={`${
+              document.cookie
+                .split("; ")
+                ?.find((v) => v?.includes("card_style"))
+                ?.split("=")?.[1] === "standard"
+                ? "!rounded-none"
+                : ""
+            }`}
+          >
             <CardHeader>
               <CardTitle>Quiz Mode</CardTitle>
               <CardDescription>

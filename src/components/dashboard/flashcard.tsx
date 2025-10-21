@@ -45,7 +45,19 @@ export function Flashcard({ front, back }: Props) {
           flipped ? "rotate-y-180" : ""
         )}
       >
-        <Card className="flex h-full w-full items-center justify-center p-6">
+        <Card
+          className={
+            "flex h-full w-full items-center justify-center p-6 " +
+            `${
+              document.cookie
+                .split("; ")
+                ?.find((v) => v?.includes("card_style"))
+                ?.split("=")?.[1] === "standard"
+                ? "!rounded-none"
+                : ""
+            }`
+          }
+        >
           <CardContent className="flex h-full w-full flex-col items-center justify-center p-6 text-center">
             <h3 className="text-xl font-bold">{front}</h3>
             <p className="mt-4 text-sm text-muted-foreground">
@@ -60,7 +72,19 @@ export function Flashcard({ front, back }: Props) {
           flipped ? "rotate-y-0" : ""
         )}
       >
-        <Card className="flex h-full w-full items-center justify-center p-6 bg-muted/50">
+        <Card
+          className={
+            "flex h-full w-full items-center justify-center p-6 bg-muted/50 " +
+            `${
+              document.cookie
+                .split("; ")
+                ?.find((v) => v?.includes("card_style"))
+                ?.split("=")?.[1] === "standard"
+                ? "!rounded-none"
+                : ""
+            }`
+          }
+        >
           <CardContent className="flex h-full w-full flex-col items-center justify-center p-6 text-center">
             <p>{back}</p>
             <p className="mt-4 text-sm text-muted-foreground">
