@@ -102,7 +102,9 @@ export default function Page() {
 
   // NEW: difficulty filter (affects flashcards + quiz for the selected deck)
   // "all" = no filter, else 1..5
-  const [difficultyFilter, setDifficultyFilter] = useState<"all" | "1" | "2" | "3" | "4" | "5">("all");
+  const [difficultyFilter, setDifficultyFilter] = useState<
+    "all" | "1" | "2" | "3" | "4" | "5"
+  >("all");
 
   // quiz state
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
@@ -183,7 +185,9 @@ export default function Page() {
         difficultyNum === null
           ? data
           : data.filter(
-              (c) => Math.min(5, Math.max(1, Number(c.difficulty) || 1)) === difficultyNum
+              (c) =>
+                Math.min(5, Math.max(1, Number(c.difficulty) || 1)) ===
+                difficultyNum
             );
 
       // update derived state from filtered list
@@ -227,7 +231,9 @@ export default function Page() {
       difficultyNum === null
         ? rawCards
         : rawCards.filter(
-            (c) => Math.min(5, Math.max(1, Number(c.difficulty) || 1)) === difficultyNum
+            (c) =>
+              Math.min(5, Math.max(1, Number(c.difficulty) || 1)) ===
+              difficultyNum
           );
 
     setCards(filtered);
@@ -477,7 +483,9 @@ export default function Page() {
           {/* NEW: Difficulty filter for current deck's flashcards */}
           <Select
             value={difficultyFilter}
-            onValueChange={(v: "all" | "1" | "2" | "3" | "4" | "5") => setDifficultyFilter(v)}
+            onValueChange={(v: "all" | "1" | "2" | "3" | "4" | "5") =>
+              setDifficultyFilter(v)
+            }
             disabled={isLoadingCards}
           >
             <SelectTrigger className="w-[180px]">
@@ -505,7 +513,15 @@ export default function Page() {
         </div>
       </DashboardHeader>
 
-      <Tabs defaultValue="cards" className="space-y-4">
+      <Tabs
+        defaultValue={
+          document.cookie
+            .split("; ")
+            ?.find((v) => v?.includes("default_review_tab"))
+            ?.split("=")?.[1] ?? "cards"
+        }
+        className="space-y-4"
+      >
         <TabsList>
           <TabsTrigger value="cards">Flashcards</TabsTrigger>
           <TabsTrigger value="quiz">Quiz Mode</TabsTrigger>

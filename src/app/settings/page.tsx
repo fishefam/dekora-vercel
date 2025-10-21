@@ -1,3 +1,5 @@
+"use client";
+
 import { DashboardHeader } from "@/components/dashboard/header";
 import { DashboardShell } from "@/components/dashboard/shell";
 import { Button } from "@/components/ui/button";
@@ -14,9 +16,9 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Separator } from "@/components/ui/separator";
 import { Slider } from "@/components/ui/slider";
-import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Laptop, Moon, Sun } from "lucide-react";
+import { setDefaultReviewTabAction } from "./page.action";
 
 export default function Page() {
   return (
@@ -45,7 +47,18 @@ export default function Page() {
               <div className="space-y-4">
                 <div className="space-y-2">
                   <Label>Default Review Tab</Label>
-                  <RadioGroup defaultValue="cards">
+
+                  <RadioGroup
+                    defaultValue={
+                      document.cookie
+                        .split("; ")
+                        ?.find((v) => v?.includes("default_review_tab"))
+                        ?.split("=")?.[1] ?? "cards"
+                    }
+                    onValueChange={async (v) => {
+                      await setDefaultReviewTabAction(v);
+                    }}
+                  >
                     <div className="flex items-center space-x-2">
                       <RadioGroupItem value="cards" id="mode-cards" />
                       <Label htmlFor="mode-cards">Flashcards</Label>
@@ -55,30 +68,6 @@ export default function Page() {
                       <Label htmlFor="mode-quiz">Quiz Mode</Label>
                     </div>
                   </RadioGroup>
-                </div>
-
-                <Separator />
-
-                <div className="space-y-2">
-                  <Label>Study Behavior</Label>
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-2">
-                        <Switch id="auto-flip" />
-                        <Label htmlFor="auto-flip">
-                          Auto-flip cards after 10 seconds
-                        </Label>
-                      </div>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-2">
-                        <Switch id="audio-feedback" defaultChecked />
-                        <Label htmlFor="audio-feedback">
-                          Play sound on correct/incorrect answers
-                        </Label>
-                      </div>
-                    </div>
-                  </div>
                 </div>
               </div>
             </CardContent>
