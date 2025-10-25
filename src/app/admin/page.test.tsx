@@ -2,20 +2,35 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import React from "react";
 
-const getUsersAction = jest.fn(async () => ({ rows: [], total: 0, page: 1 }));
+const listUsersAction = jest.fn(async () => ({
+  ok: true,
+  data: { users: [] },
+}));
 const createUserAction = jest.fn(async () => ({ ok: true }));
-const updateUserRoleAction = jest.fn(async () => ({}));
-const updateUserStatusAction = jest.fn(async () => ({}));
-const deleteUserAction = jest.fn(async () => ({}));
+const getUserAction = jest.fn(async () => ({ ok: true, data: {} }));
+const updateUserAction = jest.fn(async () => ({ ok: true }));
+const changeRoleAction = jest.fn(async () => ({ ok: true }));
+const suspendUserAction = jest.fn(async () => ({ ok: true }));
+const deleteUserAction = jest.fn(async () => ({ ok: true }));
 
 jest.mock("./action", () => ({
-  getUsersAction: (...args: any[]) => (getUsersAction as any)(...args),
+  listUsersAction: (...args: any[]) => (listUsersAction as any)(...args),
   createUserAction: (...args: any[]) => (createUserAction as any)(...args),
-  updateUserRoleAction: (...args: any[]) =>
-    (updateUserRoleAction as any)(...args),
-  updateUserStatusAction: (...args: any[]) =>
-    (updateUserStatusAction as any)(...args),
+  getUserAction: (...args: any[]) => (getUserAction as any)(...args),
+  updateUserAction: (...args: any[]) => (updateUserAction as any)(...args),
+  changeRoleAction: (...args: any[]) => (changeRoleAction as any)(...args),
+  suspendUserAction: (...args: any[]) => (suspendUserAction as any)(...args),
   deleteUserAction: (...args: any[]) => (deleteUserAction as any)(...args),
+}));
+
+// mock deck moderation actions the page imports
+jest.mock("./deck-moderation.action", () => ({
+  listDecksAction: jest.fn(async () => ({ ok: true, data: { decks: [] } })),
+  approveDeckAction: jest.fn(async () => ({ ok: true })),
+  setDeckReviewAction: jest.fn(async () => ({ ok: true })),
+  blockDeckAction: jest.fn(async () => ({ ok: true })),
+  unblockDeckAction: jest.fn(async () => ({ ok: true })),
+  deleteDeckAction: jest.fn(async () => ({ ok: true })),
 }));
 
 jest.mock("@/components/dashboard/shell", () => ({
@@ -60,6 +75,7 @@ jest.mock("@/components/ui/card", () => ({
   CardHeader: ({ children }: any) => <div>{children}</div>,
   CardTitle: ({ children }: any) => <h2>{children}</h2>,
   CardContent: ({ children }: any) => <div>{children}</div>,
+  CardDescription: ({ children }: any) => <p>{children}</p>,
 }));
 jest.mock("@/components/ui/input", () => ({
   Input: ({ value, onChange, ...rest }: any) => (
@@ -110,12 +126,12 @@ jest.mock("@/components/ui/select", () => ({
   ),
 }));
 jest.mock("@/components/ui/checkbox", () => ({
-  Checkbox: ({ checked, onCheckedChange, id }: any) => (
+  Checkbox: ({ checked, onCheckedChange, id, defaultChecked }: any) => (
     <input
       id={id}
       type="checkbox"
       aria-label={id}
-      checked={!!checked}
+      checked={!!checked || !!defaultChecked}
       onChange={() => onCheckedChange?.(!checked)}
     />
   ),
@@ -151,35 +167,41 @@ describe("Admin Page (smoke)", () => {
     jest.clearAllMocks();
   });
 
-  it("renders heading and empty state", async () => {
+  it("renders heading and table header (no users)", async () => {
     render(<Page />);
     expect(
       await screen.findByRole("heading", { level: 1, name: /admin dashboard/i })
     ).toBeInTheDocument();
-    expect(await screen.findByText(/no users found/i)).toBeInTheDocument();
+
+    // initial load should call listUsersAction once
+    await waitFor(() => expect(listUsersAction).toHaveBeenCalledTimes(1));
+
+    // table header exists and there are no data rows (only header row present)
+    const rows = screen.getAllByRole("row");
+    // one header row only
+    expect(rows.length).toBe(1);
   });
 
-  it("search + filter triggers reloads (no fragile action clicks)", async () => {
+  it("typing in search and toggling role filter do NOT trigger server reloads", async () => {
     render(<Page />);
 
     // initial load
-    await screen.findByText(/no users found/i);
-    expect(getUsersAction).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(listUsersAction).toHaveBeenCalledTimes(1));
 
-    // type in search input (debounced in component)
+    // type in search input (component filters client-side)
     const search = screen.getByPlaceholderText(/search users/i);
     fireEvent.change(search, { target: { value: "ada" } });
 
-    // click the exact Filter button (not the labels)
-    const filterBtn = screen.getByRole("button", { name: /^filter$/i });
+    // click the Filters button
+    const filterBtn = screen.getByRole("button", { name: /^filters?$/i });
     fireEvent.click(filterBtn);
 
     // toggle a checkbox to change filters
     const roleBox = screen.getByLabelText("filter-admin");
     fireEvent.click(roleBox);
 
-    await waitFor(() => expect(getUsersAction).toHaveBeenCalledTimes(2));
-    expect(true).toBe(true);
+    // since current page filters client-side, listUsersAction should NOT be called again
+    await waitFor(() => expect(listUsersAction).toHaveBeenCalledTimes(1));
   });
 
   it("opens add user dialog and calls create action", async () => {
@@ -196,13 +218,13 @@ describe("Admin Page (smoke)", () => {
       target: { value: "grace@example.com" },
     });
 
-    const roleSelect = screen.getByLabelText(
-      "role-select"
-    ) as HTMLSelectElement;
+    const roleSelect = screen.getByLabelText("role-select") as HTMLSelectElement;
     fireEvent.change(roleSelect, { target: { value: "admin" } });
 
     fireEvent.click(screen.getByRole("button", { name: /create user/i }));
-    await waitFor(() => expect(createUserAction).toHaveBeenCalled());
-    expect(true).toBe(true);
+    await waitFor(() => expect(createUserAction).toHaveBeenCalledTimes(1));
+
+    // create triggers refreshList which calls listUsersAction again
+    await waitFor(() => expect(listUsersAction).toHaveBeenCalledTimes(2));
   });
 });
