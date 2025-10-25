@@ -834,6 +834,54 @@ export default function AdminDashboardPage() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* Role change dialog (added) */}
+        <Dialog open={roleOpen} onOpenChange={(open) => setRoleOpen(open)}>
+          <DialogContent>
+            <form onSubmit={saveRoleChange}>
+              <DialogHeader>
+                <DialogTitle>Change Role</DialogTitle>
+              </DialogHeader>
+
+              <div className="py-4">
+                <div className="space-y-2">
+                  <Label htmlFor="change-role">Role</Label>
+                  <Select
+                    value={roleState.role}
+                    onValueChange={(v) =>
+                      setRoleState((p) => ({ ...p, role: v }))
+                    }
+                  >
+                    <SelectTrigger id="change-role">
+                      <SelectValue placeholder="Select role" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="user">User</SelectItem>
+                      <SelectItem value="admin">Admin</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="mt-3 text-sm text-muted-foreground">
+                  Changing role for user ID: {roleState.id || "-"}
+                </div>
+              </div>
+
+              <DialogFooter>
+                <Button type="submit" disabled={changingRole}>
+                  {changingRole ? "Saving..." : "Save Role"}
+                </Button>
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    setRoleOpen(false);
+                  }}
+                >
+                  Cancel
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
       </DashboardHeader>
 
       <div className="px-6 pb-8">
@@ -1030,37 +1078,22 @@ export default function AdminDashboardPage() {
                                   View Profile
                                 </DropdownMenuItem>
 
-                                <DropdownMenuItem
-                                  onClick={() => onOpenEdit(user.id)}
-                                  className="flex items-center gap-2"
-                                >
-                                  <PenLine className="h-4 w-4" />
-                                  Edit User
-                                </DropdownMenuItem>
+                                {/* Edit User removed from dropdown */}
 
                                 <DropdownMenuSeparator />
 
                                 <DropdownMenuItem
                                   onClick={() =>
-                                    onOpenChangeRole(user.id, user.role)
+                                    onOpenChangeRole(
+                                      user.id,
+                                      (user.role ?? "user").toLowerCase()
+                                    )
                                   }
                                   className="flex items-center gap-2"
                                 >
                                   <Shield className="h-4 w-4" />
                                   Change Role
                                 </DropdownMenuItem>
-
-                                {user.lastActive !== "-" && (
-                                  <DropdownMenuItem
-                                    onClick={() =>
-                                      onConfirm("suspend", user.id)
-                                    }
-                                    className="flex items-center gap-2"
-                                  >
-                                    <Lock className="h-4 w-4" />
-                                    Suspend User
-                                  </DropdownMenuItem>
-                                )}
 
                                 <DropdownMenuSeparator />
 

@@ -61,28 +61,42 @@ const navItems: NavItem[] = [
   },
 ];
 
-export function DashboardNav() {
+export function DashboardNav({
+  role,
+  userRaw,
+}: {
+  role?: string;
+  // pass the full user object (or at least raw_user_meta_data) here
+  userRaw?: any;
+}) {
   const pathname = usePathname();
+
+  // Prefer raw_user_meta_data.role when available
+  const rawRole =
+    userRaw?.raw_user_meta_data?.role ?? userRaw?.profile?.role ?? role ?? "";
+  const isAdmin = String(rawRole).toLowerCase() === "admin";
 
   return (
     <nav className="grid items-start gap-2 px-2 py-4">
-      {navItems.map((item) => (
-        <Link
-          key={item.href}
-          href={item.disabled ? "#" : item.href}
-          className={cn(
-            buttonVariants({ variant: "ghost" }),
-            pathname === item.href
-              ? "bg-muted hover:bg-muted"
-              : "hover:bg-transparent hover:underline",
-            "justify-start",
-            item.disabled && "cursor-not-allowed opacity-60"
-          )}
-        >
-          <item.icon className="mr-2 h-4 w-4" />
-          {item.title}
-        </Link>
-      ))}
+      {navItems
+        .filter((item) => item.href !== "/admin" || isAdmin)
+        .map((item) => (
+          <Link
+            key={item.href}
+            href={item.disabled ? "#" : item.href}
+            className={cn(
+              buttonVariants({ variant: "ghost" }),
+              pathname === item.href
+                ? "bg-muted hover:bg-muted"
+                : "hover:bg-transparent hover:underline",
+              "justify-start",
+              item.disabled && "cursor-not-allowed opacity-60"
+            )}
+          >
+            <item.icon className="mr-2 h-4 w-4" />
+            {item.title}
+          </Link>
+        ))}
     </nav>
   );
 }
