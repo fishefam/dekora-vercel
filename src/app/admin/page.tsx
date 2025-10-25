@@ -1096,9 +1096,9 @@ export default function AdminDashboardPage() {
           <TabsContent value="content" className="space-y-4">
             <Card className="shadow-sm rounded-lg overflow-hidden">
               <CardHeader className="px-6 py-4 bg-white">
-                <CardTitle className="text-xl">Content Moderation</CardTitle>
+                <CardTitle className="text-xl">Deck Moderation</CardTitle>
                 <CardDescription className="text-sm text-muted-foreground">
-                  Review and moderate user-created content.
+                  Moderate user-created content.
                 </CardDescription>
               </CardHeader>
               <CardContent className="p-6">
