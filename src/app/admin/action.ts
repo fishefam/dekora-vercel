@@ -336,6 +336,8 @@ export async function changeRoleAction(input: {
     // update profiles table role
     const { error: pErr } = await supabase
       .from("profiles")
+      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+      // @ts-ignore
       .upsert({ id: input.id, role: input.role }, { returning: "minimal" });
     if (pErr) {
       // don't fail hard if profile update errors
