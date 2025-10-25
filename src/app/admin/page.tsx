@@ -169,6 +169,9 @@ export default function AdminDashboardPage() {
             const joined = u.created_at
               ? new Date(u.created_at).toLocaleDateString()
               : "-";
+            // decks_count is provided by action.ts
+            const decksCount =
+              typeof u.decks_count === "number" ? u.decks_count : 0;
             return {
               id: u.id,
               avatar,
@@ -177,7 +180,7 @@ export default function AdminDashboardPage() {
               rawFull, // full name from auth.raw_user_meta_data
               role,
               lastActive,
-              decks: "-", // placeholder
+              decks: decksCount,
               joined,
             };
           });
@@ -224,6 +227,8 @@ export default function AdminDashboardPage() {
             const joined = u.created_at
               ? new Date(u.created_at).toLocaleDateString()
               : "-";
+            const decksCount =
+              typeof u.decks_count === "number" ? u.decks_count : 0;
             return {
               id: u.id,
               avatar,
@@ -232,7 +237,7 @@ export default function AdminDashboardPage() {
               rawFull,
               role,
               lastActive,
-              decks: "-",
+              decks: decksCount,
               joined,
             };
           })

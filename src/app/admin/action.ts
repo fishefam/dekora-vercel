@@ -1,3 +1,4 @@
+// ...existing code...
 "use server";
 
 import "server-only";
@@ -27,6 +28,10 @@ export type AdminUserRow = {
   banned_until: string | null;
   app_metadata?: Record<string, unknown> | null;
   user_metadata?: Record<string, unknown> | null;
+  // pass through raw_user_meta_data from auth.users (firstName/lastName)
+  raw_user_meta_data?: Record<string, any> | null;
+  // decks count derived from decks.user_id
+  decks_count?: number | null;
   profile?: {
     id: string;
     full_name: string | null;
@@ -65,6 +70,8 @@ function mapAuthUser(u: any): AdminUserRow {
     banned_until: u?.banned_until ?? null,
     app_metadata: u?.app_metadata ?? null,
     user_metadata: u?.user_metadata ?? null,
+    raw_user_meta_data: u?.raw_user_meta_data ?? null,
+    decks_count: 0,
     profile: null,
   };
 }
@@ -73,6 +80,7 @@ function mapAuthUser(u: any): AdminUserRow {
 
 /**
  * List users (paged) from auth.users and join profiles by id.
+ * Also fetch decks counts and attach as decks_count on each user row.
  * Server-only; requires service role key.
  */
 export async function listUsersAction(
@@ -113,6 +121,26 @@ export async function listUsersAction(
       // if pErr, we silently skip profiles to keep the list working
     }
 
+    // fetch decks rows for these user ids and compute counts
+    if (ids.length > 0) {
+      const { data: decksRows, error: dErr } = await supabase
+        .from("decks")
+        .select("user_id")
+        .in("user_id", ids);
+      if (!dErr && decksRows) {
+        const counts = new Map<string, number>();
+        for (const r of decksRows) {
+          const uid = r.user_id;
+          counts.set(uid, (counts.get(uid) ?? 0) + 1);
+        }
+        for (const u of authUsers) {
+          (u as any).decks_count = counts.get(u.id) ?? 0;
+        }
+      } else {
+        // leave decks_count as 0 on error
+      }
+    }
+
     // optional fuzzy filter (email/id/full_name/profile.email)
     const filtered = q
       ? authUsers.filter(
@@ -120,7 +148,12 @@ export async function listUsersAction(
             (u.email ?? "").toLowerCase().includes(q) ||
             (u.id ?? "").toLowerCase().includes(q) ||
             (u.profile?.full_name ?? "").toLowerCase().includes(q) ||
-            (u.profile?.email ?? "").toLowerCase().includes(q)
+            (u.profile?.email ?? "").toLowerCase().includes(q) ||
+            `${u.raw_user_meta_data?.firstName ?? ""} ${
+              u.raw_user_meta_data?.lastName ?? ""
+            }`
+              .toLowerCase()
+              .includes(q)
         )
       : authUsers;
 
@@ -131,7 +164,7 @@ export async function listUsersAction(
 }
 
 /**
- * Get a single user by id (+profile).
+ * Get a single user by id (+profile + decks_count).
  */
 export async function getUserAction(id: string): Promise<Result<AdminUserRow>> {
   try {
@@ -153,6 +186,17 @@ export async function getUserAction(id: string): Promise<Result<AdminUserRow>> {
       .maybeSingle();
 
     row.profile = profile ?? null;
+
+    // decks count for this user
+    const { data: decksRows, error: dErr } = await supabase
+      .from("decks")
+      .select("id")
+      .eq("user_id", id);
+    if (!dErr && decksRows) {
+      row.decks_count = decksRows.length;
+    } else {
+      row.decks_count = 0;
+    }
 
     return { ok: true, data: row };
   } catch (e: any) {
@@ -207,6 +251,7 @@ export async function createUserAction(input: {
 
     const row = mapAuthUser(user);
     row.profile = profileRow as any;
+    row.decks_count = 0;
 
     return { ok: true, data: row };
   } catch (e: any) {
@@ -247,12 +292,16 @@ export async function updateUserAction(input: {
 
     // upsert profile row with provided fields
     const profileRow: any = { id: input.id };
-    if (typeof input.full_name !== "undefined") profileRow.full_name = input.full_name;
-    if (typeof input.avatar_url !== "undefined") profileRow.avatar_url = input.avatar_url;
+    if (typeof input.full_name !== "undefined")
+      profileRow.full_name = input.full_name;
+    if (typeof input.avatar_url !== "undefined")
+      profileRow.avatar_url = input.avatar_url;
     if (typeof input.status !== "undefined") profileRow.status = input.status;
 
     if (Object.keys(profileRow).length > 1) {
-      const { error: pErr } = await supabase.from("profiles").upsert(profileRow);
+      const { error: pErr } = await supabase
+        .from("profiles")
+        .upsert(profileRow);
       if (pErr) {
         // best-effort, don't fail entire operation on profile error
         console.error("profile upsert failed", pErr);
@@ -328,25 +377,6 @@ export async function suspendUserAction(input: {
 }
 
 /**
- * Activate / unsuspend a user by clearing banned_until.
- */
-export async function activateUserAction(id: string): Promise<Result<AdminUserRow>> {
-  try {
-    if (!id) return { ok: false, error: "Missing user id" };
-    const supabase = getAdminClient();
-
-    const { error } = await supabase.auth.admin.updateUserById(id, {
-      banned_until: null,
-    } as any);
-    if (error) return { ok: false, error: error.message };
-
-    return await getUserAction(id);
-  } catch (e: any) {
-    return { ok: false, error: e?.message ?? "Failed to activate user" };
-  }
-}
-
-/**
  * Delete a user (auth + profile)
  */
 export async function deleteUserAction(id: string): Promise<Result<null>> {
@@ -359,7 +389,10 @@ export async function deleteUserAction(id: string): Promise<Result<null>> {
     if (error) return { ok: false, error: error.message };
 
     // best-effort: remove profile row
-    const { error: pErr } = await supabase.from("profiles").delete().eq("id", id);
+    const { error: pErr } = await supabase
+      .from("profiles")
+      .delete()
+      .eq("id", id);
     if (pErr) console.error("failed to delete profile", pErr);
 
     return { ok: true, data: null };
@@ -367,3 +400,4 @@ export async function deleteUserAction(id: string): Promise<Result<null>> {
     return { ok: false, error: e?.message ?? "Failed to delete user" };
   }
 }
+// ...existing code...
