@@ -59,7 +59,14 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { decks } from "./mocks";
+import {
+  listDecksAction,
+  approveDeckAction,
+  setDeckReviewAction,
+  blockDeckAction,
+  unblockDeckAction,
+  deleteDeckAction,
+} from "./deck-moderation.action";
 import {
   listUsersAction,
   createUserAction,
@@ -73,6 +80,7 @@ import { DashboardShell } from "@/components/dashboard/shell";
 import { DashboardHeader } from "@/components/dashboard/header";
 
 export default function AdminDashboardPage() {
+  // ...existing user-management state/hooks...
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [users, setUsers] = useState<any[]>([]);
@@ -98,6 +106,11 @@ export default function AdminDashboardPage() {
     blocked: false,
     reported: false,
   });
+
+  // --- decks state (connected to deck-moderation.action.ts) ---
+  const [decksList, setDecksList] = useState<any[]>([]);
+  const [decksLoading, setDecksLoading] = useState(false);
+  const [decksError, setDecksError] = useState<string | null>(null);
 
   // --- add user form state ---
   const [addOpen, setAddOpen] = useState(false);
@@ -137,6 +150,7 @@ export default function AdminDashboardPage() {
   } | null>(null);
   const [confirmLoading, setConfirmLoading] = useState(false);
 
+  // fetch users (unchanged)
   useEffect(() => {
     let mounted = true;
     async function fetchUsers() {
@@ -146,13 +160,11 @@ export default function AdminDashboardPage() {
         const res = await listUsersAction({ perPage, page });
         if (!mounted) return;
         if (res.ok) {
-          // map server AdminUserRow -> UI shape
           const capitalize = (s?: string | null) =>
             s && s.length ? s[0].toUpperCase() + s.slice(1) : "User";
 
           const mapped = res.data.users.map((u: any) => {
             const profile = u.profile ?? {};
-            // prefer profile.full_name, else try raw_user_meta_data from auth user
             const rawFirst = (u as any).raw_user_meta_data?.firstName ?? "";
             const rawLast = (u as any).raw_user_meta_data?.lastName ?? "";
             const rawFull = `${rawFirst} ${rawLast}`.trim();
@@ -160,7 +172,6 @@ export default function AdminDashboardPage() {
             const email = u.email ?? profile.email ?? "";
             const avatar = profile.avatar_url ?? undefined;
             const role = capitalize(profile.role ?? "user");
-            // Last Active => human readable datetime
             const lastActiveRaw =
               profile.last_active_at ?? u.last_sign_in_at ?? null;
             const lastActive = lastActiveRaw
@@ -169,7 +180,6 @@ export default function AdminDashboardPage() {
             const joined = u.created_at
               ? new Date(u.created_at).toLocaleDateString()
               : "-";
-            // decks_count is provided by action.ts
             const decksCount =
               typeof u.decks_count === "number" ? u.decks_count : 0;
             return {
@@ -177,7 +187,7 @@ export default function AdminDashboardPage() {
               avatar,
               name,
               email,
-              rawFull, // full name from auth.raw_user_meta_data
+              rawFull,
               role,
               lastActive,
               decks: decksCount,
@@ -252,18 +262,17 @@ export default function AdminDashboardPage() {
     }
   };
 
-  // compose filtered users using query + filters
+  // compose filtered users using query + filters (unchanged)
   const filteredUsers = useMemo(() => {
     const q = query.trim().toLowerCase();
     const selectedRoles = Object.entries(roleFilters)
       .filter(([, v]) => v)
-      .map(([k]) => k); // e.g. ["admin","user"]
+      .map(([k]) => k);
     const selectedStatuses = Object.entries(statusFilters)
       .filter(([, v]) => v)
-      .map(([k]) => k); // can still filter by status if needed
+      .map(([k]) => k);
 
     return users.filter((u) => {
-      // query match
       if (
         q &&
         !(
@@ -275,15 +284,12 @@ export default function AdminDashboardPage() {
         return false;
       }
 
-      // role filter
       if (selectedRoles.length > 0) {
         const userRole = (u.role ?? "user").toLowerCase();
         if (!selectedRoles.includes(userRole)) return false;
       }
 
-      // status filter (note: UI no longer shows status column but filter remains)
       if (selectedStatuses.length > 0) {
-        // best-effort: derive from user raw data presence
         const userStatus = (u.status ?? "inactive").toLowerCase();
         if (!selectedStatuses.includes(userStatus)) return false;
       }
@@ -292,52 +298,257 @@ export default function AdminDashboardPage() {
     });
   }, [users, query, roleFilters, statusFilters]);
 
-  const filteredDecks = useMemo(() => {
-    const selected = Object.entries(deckFilters)
+  // Deck moderation: build status param from deckFilters (prefer single selection)
+  function getDeckStatusFromFilters() {
+    const s = Object.entries(deckFilters)
       .filter(([, v]) => v)
       .map(([k]) => k);
-    if (selected.length === 0) return decks;
-    return decks.filter((d) => {
-      if (selected.includes("reported") && d.reported) return true;
-      if (selected.includes("published") && d.status === "Published")
-        return true;
-      if (selected.includes("review") && d.status === "Under Review")
-        return true;
-      if (selected.includes("blocked") && d.status === "Blocked") return true;
-      return false;
-    });
-  }, [deckFilters]);
+    if (s.length === 1) return s[0] as any;
+    // if multiple or none selected, return undefined to fetch all
+    return undefined;
+  }
 
-  async function handleCreateUser(e?: React.FormEvent) {
-    e?.preventDefault?.();
-    setCreating(true);
-    setCreateError(null);
-    try {
-      const fullName =
-        (firstName || lastName) && `${firstName} ${lastName}`.trim();
-      const res = await createUserAction({
-        email: newEmail,
-        full_name: fullName ?? undefined,
-        role: newRole,
-      });
-      if (!res.ok) {
-        setCreateError(res.error ?? "Failed to create user");
-        return;
+  const [deckQuery, setDeckQuery] = useState<string>("");
+
+  // fetch decks (calls server action)
+  useEffect(() => {
+    let mounted = true;
+    async function fetchDecks() {
+      setDecksLoading(true);
+      setDecksError(null);
+      try {
+        const status = getDeckStatusFromFilters();
+        const res = await listDecksAction({
+          perPage: 50,
+          page: 1,
+          query: deckQuery ?? undefined,
+          status,
+        });
+        if (!mounted) return;
+        if (!res.ok) {
+          setDecksError(res.error ?? "Failed to load decks");
+          setDecksList([]);
+          return;
+        }
+        const mapped = res.data.decks.map((d: any) => {
+          const creatorName =
+            d.creator?.full_name ?? d.creator?.email ?? "Unknown";
+          const creatorEmail = d.creator?.email ?? "";
+          // Keep status flags on the raw object; remove displayed status column
+          return {
+            id: d.id,
+            name: d.name,
+            description: d.description,
+            creatorName,
+            creatorEmail,
+            flashcards_count: d.flashcards_count ?? 0,
+            is_public: Boolean(d.is_public),
+            is_archived: Boolean(d.is_archived),
+            study_count: d.study_count ?? 0,
+            created_at: d.created_at,
+            updated_at: d.updated_at,
+            reported: Boolean(d.reported),
+            raw: d,
+          };
+        });
+        setDecksList(mapped);
+      } catch (e: any) {
+        setDecksError(e?.message ?? "Failed to load decks");
+        setDecksList([]);
+      } finally {
+        if (mounted) setDecksLoading(false);
       }
-      await refreshList();
-      setFirstName("");
-      setLastName("");
-      setNewEmail("");
-      setNewRole("user");
-      setAddOpen(false);
-    } catch (err: any) {
-      setCreateError(err?.message ?? "Failed to create user");
+    }
+
+    fetchDecks();
+    return () => {
+      mounted = false;
+    };
+  }, [deckFilters, deckQuery]);
+
+  // deck moderation actions
+  async function handleApprove(deckId: string) {
+    setDecksLoading(true);
+    try {
+      const res = await approveDeckAction(deckId);
+      if (!res.ok) setDecksError(res.error ?? "Failed to approve");
+      await Promise.resolve(); // allow re-render
     } finally {
-      setCreating(false);
+      // refresh
+      const status = getDeckStatusFromFilters();
+      const r = await listDecksAction({ perPage: 50, page: 1, status });
+      if (r.ok) {
+        const mapped = r.data.decks.map((d: any) => ({
+          id: d.id,
+          name: d.name,
+          description: d.description,
+          creatorName: d.creator?.full_name ?? d.creator?.email ?? "Unknown",
+          creatorEmail: d.creator?.email ?? "",
+          flashcards_count: d.flashcards_count ?? 0,
+          statusLabel: d.is_archived
+            ? "Blocked"
+            : d.is_public
+            ? "Published"
+            : "Under Review",
+          is_public: Boolean(d.is_public),
+          is_archived: Boolean(d.is_archived),
+          study_count: d.study_count ?? 0,
+          created_at: d.created_at,
+          updated_at: d.updated_at,
+          reported: Boolean(d.reported),
+          raw: d,
+        }));
+        setDecksList(mapped);
+      }
+      setDecksLoading(false);
     }
   }
 
-  // Actions from dropdown
+  async function handleSetReview(deckId: string) {
+    setDecksLoading(true);
+    try {
+      const res = await setDeckReviewAction(deckId);
+      if (!res.ok) setDecksError(res.error ?? "Failed to set review");
+    } finally {
+      const status = getDeckStatusFromFilters();
+      const r = await listDecksAction({ perPage: 50, page: 1, status });
+      if (r.ok) {
+        setDecksList(
+          r.data.decks.map((d: any) => ({
+            id: d.id,
+            name: d.name,
+            description: d.description,
+            creatorName: d.creator?.full_name ?? d.creator?.email ?? "Unknown",
+            creatorEmail: d.creator?.email ?? "",
+            flashcards_count: d.flashcards_count ?? 0,
+            statusLabel: d.is_archived
+              ? "Blocked"
+              : d.is_public
+              ? "Published"
+              : "Under Review",
+            is_public: Boolean(d.is_public),
+            is_archived: Boolean(d.is_archived),
+            study_count: d.study_count ?? 0,
+            created_at: d.created_at,
+            updated_at: d.updated_at,
+            reported: Boolean(d.reported),
+            raw: d,
+          }))
+        );
+      }
+      setDecksLoading(false);
+    }
+  }
+
+  async function handleBlock(deckId: string) {
+    setDecksLoading(true);
+    try {
+      const res = await blockDeckAction(deckId);
+      if (!res.ok) setDecksError(res.error ?? "Failed to block");
+    } finally {
+      const status = getDeckStatusFromFilters();
+      const r = await listDecksAction({ perPage: 50, page: 1, status });
+      if (r.ok) {
+        setDecksList(
+          r.data.decks.map((d: any) => ({
+            id: d.id,
+            name: d.name,
+            description: d.description,
+            creatorName: d.creator?.full_name ?? d.creator?.email ?? "Unknown",
+            creatorEmail: d.creator?.email ?? "",
+            flashcards_count: d.flashcards_count ?? 0,
+            statusLabel: d.is_archived
+              ? "Blocked"
+              : d.is_public
+              ? "Published"
+              : "Under Review",
+            is_public: Boolean(d.is_public),
+            is_archived: Boolean(d.is_archived),
+            study_count: d.study_count ?? 0,
+            created_at: d.created_at,
+            updated_at: d.updated_at,
+            reported: Boolean(d.reported),
+            raw: d,
+          }))
+        );
+      }
+      setDecksLoading(false);
+    }
+  }
+
+  async function handleUnblock(deckId: string) {
+    setDecksLoading(true);
+    try {
+      const res = await unblockDeckAction(deckId);
+      if (!res.ok) setDecksError(res.error ?? "Failed to unblock");
+    } finally {
+      const status = getDeckStatusFromFilters();
+      const r = await listDecksAction({ perPage: 50, page: 1, status });
+      if (r.ok) {
+        setDecksList(
+          r.data.decks.map((d: any) => ({
+            id: d.id,
+            name: d.name,
+            description: d.description,
+            creatorName: d.creator?.full_name ?? d.creator?.email ?? "Unknown",
+            creatorEmail: d.creator?.email ?? "",
+            flashcards_count: d.flashcards_count ?? 0,
+            statusLabel: d.is_archived
+              ? "Blocked"
+              : d.is_public
+              ? "Published"
+              : "Under Review",
+            is_public: Boolean(d.is_public),
+            is_archived: Boolean(d.is_archived),
+            study_count: d.study_count ?? 0,
+            created_at: d.created_at,
+            updated_at: d.updated_at,
+            reported: Boolean(d.reported),
+            raw: d,
+          }))
+        );
+      }
+      setDecksLoading(false);
+    }
+  }
+
+  async function handleDeleteDeck(deckId: string) {
+    setDecksLoading(true);
+    try {
+      const res = await deleteDeckAction(deckId);
+      if (!res.ok) setDecksError(res.error ?? "Failed to delete");
+    } finally {
+      const status = getDeckStatusFromFilters();
+      const r = await listDecksAction({ perPage: 50, page: 1, status });
+      if (r.ok) {
+        setDecksList(
+          r.data.decks.map((d: any) => ({
+            id: d.id,
+            name: d.name,
+            description: d.description,
+            creatorName: d.creator?.full_name ?? d.creator?.email ?? "Unknown",
+            creatorEmail: d.creator?.email ?? "",
+            flashcards_count: d.flashcards_count ?? 0,
+            statusLabel: d.is_archived
+              ? "Blocked"
+              : d.is_public
+              ? "Published"
+              : "Under Review",
+            is_public: Boolean(d.is_public),
+            is_archived: Boolean(d.is_archived),
+            study_count: d.study_count ?? 0,
+            created_at: d.created_at,
+            updated_at: d.updated_at,
+            reported: Boolean(d.reported),
+            raw: d,
+          }))
+        );
+      }
+      setDecksLoading(false);
+    }
+  }
+
+  // rest of user-management action handlers unchanged (onViewProfile, edit, etc.)
   async function onViewProfile(id: string) {
     setProfileOpen(true);
     setProfileDetails(null);
@@ -456,7 +667,37 @@ export default function AdminDashboardPage() {
             </Button>
           </DialogTrigger>
           <DialogContent>
-            <form onSubmit={handleCreateUser}>
+            <form
+              onSubmit={async (e) => {
+                e?.preventDefault?.();
+                setCreating(true);
+                setCreateError(null);
+                try {
+                  const fullName =
+                    (firstName || lastName) &&
+                    `${firstName} ${lastName}`.trim();
+                  const res = await createUserAction({
+                    email: newEmail,
+                    full_name: fullName ?? undefined,
+                    role: newRole,
+                  });
+                  if (!res.ok) {
+                    setCreateError(res.error ?? "Failed to create user");
+                    return;
+                  }
+                  await refreshList();
+                  setFirstName("");
+                  setLastName("");
+                  setNewEmail("");
+                  setNewRole("user");
+                  setAddOpen(false);
+                } catch (err: any) {
+                  setCreateError(err?.message ?? "Failed to create user");
+                } finally {
+                  setCreating(false);
+                }
+              }}
+            >
               <DialogHeader>
                 <DialogTitle>Add New User</DialogTitle>
               </DialogHeader>
@@ -541,7 +782,7 @@ export default function AdminDashboardPage() {
           </DialogContent>
         </Dialog>
 
-        {/* Profile dialog */}
+        {/* Profile dialog (unchanged) */}
         <Dialog
           open={profileOpen}
           onOpenChange={(open) => {
@@ -593,122 +834,6 @@ export default function AdminDashboardPage() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
-
-        {/* Edit user dialog */}
-        <Dialog open={editOpen} onOpenChange={setEditOpen}>
-          <DialogContent>
-            <form onSubmit={saveEdit}>
-              <DialogHeader>
-                <DialogTitle>Edit User</DialogTitle>
-              </DialogHeader>
-              <div className="grid gap-4 py-4">
-                <div className="space-y-2">
-                  <Label>Email</Label>
-                  <Input
-                    value={editState.email}
-                    onChange={(e) =>
-                      setEditState((s) => ({ ...s, email: e.target.value }))
-                    }
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Full name</Label>
-                  <Input
-                    value={editState.full_name}
-                    onChange={(e) =>
-                      setEditState((s) => ({ ...s, full_name: e.target.value }))
-                    }
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Avatar URL</Label>
-                  <Input
-                    value={editState.avatar_url}
-                    onChange={(e) =>
-                      setEditState((s) => ({
-                        ...s,
-                        avatar_url: e.target.value,
-                      }))
-                    }
-                  />
-                </div>
-              </div>
-              <DialogFooter>
-                <Button type="submit" disabled={savingEdit}>
-                  {savingEdit ? "Saving..." : "Save"}
-                </Button>
-                <Button variant="outline" onClick={() => setEditOpen(false)}>
-                  Cancel
-                </Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
-
-        {/* Change role dialog */}
-        <Dialog open={roleOpen} onOpenChange={setRoleOpen}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Change Role</DialogTitle>
-            </DialogHeader>
-            <form onSubmit={saveRoleChange}>
-              <div className="py-4">
-                <Label>Role</Label>
-                <Select
-                  value={roleState.role}
-                  onValueChange={(v) =>
-                    setRoleState((s) => ({ ...s, role: v }))
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Role" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="user">User</SelectItem>
-                    <SelectItem value="admin">Admin</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <DialogFooter>
-                <Button type="submit" disabled={changingRole}>
-                  {changingRole ? "Saving..." : "Save"}
-                </Button>
-                <Button variant="outline" onClick={() => setRoleOpen(false)}>
-                  Cancel
-                </Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
-
-        {/* Confirm dialog (suspend/delete) */}
-        <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Confirm</DialogTitle>
-            </DialogHeader>
-            <div className="py-4">
-              <div>
-                {confirmAction?.type === "suspend" && (
-                  <div>Are you sure you want to suspend this user?</div>
-                )}
-                {confirmAction?.type === "delete" && (
-                  <div className="text-destructive">
-                    This will permanently delete the user. Continue?
-                  </div>
-                )}
-              </div>
-            </div>
-            <DialogFooter>
-              <Button onClick={executeConfirm} disabled={confirmLoading}>
-                {confirmLoading ? "Working..." : "Confirm"}
-              </Button>
-              <Button variant="outline" onClick={() => setConfirmOpen(false)}>
-                Cancel
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
       </DashboardHeader>
 
       <div className="px-6 pb-8">
@@ -718,6 +843,7 @@ export default function AdminDashboardPage() {
             <TabsTrigger value="content">Content Moderation</TabsTrigger>
           </TabsList>
 
+          {/* User management tab (unchanged rendering) */}
           <TabsContent value="users" className="space-y-4">
             <Card className="shadow-sm rounded-lg overflow-hidden">
               <CardHeader className="px-6 py-4 bg-white">
@@ -966,6 +1092,7 @@ export default function AdminDashboardPage() {
             </Card>
           </TabsContent>
 
+          {/* Content moderation tab (connected to deck-moderation.action.ts) */}
           <TabsContent value="content" className="space-y-4">
             <Card className="shadow-sm rounded-lg overflow-hidden">
               <CardHeader className="px-6 py-4 bg-white">
@@ -983,75 +1110,21 @@ export default function AdminDashboardPage() {
                         type="search"
                         placeholder="Search decks..."
                         className="pl-10 w-[320px]"
+                        value={deckQuery}
+                        onChange={(e) => setDeckQuery(e.target.value)}
                       />
                     </div>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="outline" size="sm">
-                          Filter
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-56">
-                        <DropdownMenuLabel>Filter by</DropdownMenuLabel>
-                        <DropdownMenuSeparator />
-                        <div className="p-3 space-y-3">
-                          <label className="flex items-center gap-2">
-                            <Checkbox
-                              id="filter-published"
-                              checked={deckFilters.published}
-                              onCheckedChange={(v) =>
-                                setDeckFilters((p) => ({
-                                  ...p,
-                                  published: Boolean(v),
-                                }))
-                              }
-                            />
-                            <span>Published</span>
-                          </label>
-                          <label className="flex items-center gap-2">
-                            <Checkbox
-                              id="filter-review"
-                              checked={deckFilters.review}
-                              onCheckedChange={(v) =>
-                                setDeckFilters((p) => ({
-                                  ...p,
-                                  review: Boolean(v),
-                                }))
-                              }
-                            />
-                            <span>Under Review</span>
-                          </label>
-                          <label className="flex items-center gap-2">
-                            <Checkbox
-                              id="filter-blocked"
-                              checked={deckFilters.blocked}
-                              onCheckedChange={(v) =>
-                                setDeckFilters((p) => ({
-                                  ...p,
-                                  blocked: Boolean(v),
-                                }))
-                              }
-                            />
-                            <span>Blocked</span>
-                          </label>
-                          <label className="flex items-center gap-2">
-                            <Checkbox
-                              id="filter-reported"
-                              checked={deckFilters.reported}
-                              onCheckedChange={(v) =>
-                                setDeckFilters((p) => ({
-                                  ...p,
-                                  reported: Boolean(v),
-                                }))
-                              }
-                            />
-                            <span>Reported</span>
-                          </label>
-                        </div>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
                   </div>
                 </div>
+
+                {decksLoading && (
+                  <div className="p-4 text-sm text-muted-foreground">
+                    Loading decks...
+                  </div>
+                )}
+                {decksError && (
+                  <div className="p-4 text-sm text-red-600">{decksError}</div>
+                )}
 
                 <div className="rounded-lg overflow-hidden border border-gray-100 shadow">
                   <Table className="min-w-full bg-white">
@@ -1060,7 +1133,6 @@ export default function AdminDashboardPage() {
                         <TableHead>Deck Name</TableHead>
                         <TableHead>Creator</TableHead>
                         <TableHead>Cards</TableHead>
-                        <TableHead>Status</TableHead>
                         <TableHead>Views</TableHead>
                         <TableHead>Created</TableHead>
                         <TableHead>Last Updated</TableHead>
@@ -1068,7 +1140,7 @@ export default function AdminDashboardPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {filteredDecks.map((deck) => (
+                      {decksList.map((deck) => (
                         <TableRow
                           key={deck.id}
                           className={`hover:bg-gray-50 ${
@@ -1084,25 +1156,34 @@ export default function AdminDashboardPage() {
                                 </Badge>
                               )}
                             </div>
+                            {deck.description && (
+                              <div className="text-xs text-muted-foreground mt-1">
+                                {deck.description}
+                              </div>
+                            )}
                           </TableCell>
-                          <TableCell>{deck.creator}</TableCell>
-                          <TableCell>{deck.cards}</TableCell>
                           <TableCell>
-                            <Badge
-                              variant={
-                                deck.status === "Published"
-                                  ? "default"
-                                  : deck.status === "Under Review"
-                                  ? "secondary"
-                                  : "destructive"
-                              }
-                            >
-                              {deck.status}
-                            </Badge>
+                            <div>
+                              <div className="font-medium">
+                                {deck.creatorName}
+                              </div>
+                              <div className="text-xs text-muted-foreground">
+                                {deck.creatorEmail}
+                              </div>
+                            </div>
                           </TableCell>
-                          <TableCell>{deck.views}</TableCell>
-                          <TableCell>{deck.created}</TableCell>
-                          <TableCell>{deck.lastUpdated}</TableCell>
+                          <TableCell>{deck.flashcards_count}</TableCell>
+                          <TableCell>{deck.study_count ?? "-"}</TableCell>
+                          <TableCell>
+                            {deck.created_at
+                              ? new Date(deck.created_at).toLocaleDateString()
+                              : "-"}
+                          </TableCell>
+                          <TableCell>
+                            {deck.updated_at
+                              ? new Date(deck.updated_at).toLocaleString()
+                              : "-"}
+                          </TableCell>
                           <TableCell className="text-right">
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
@@ -1115,40 +1196,10 @@ export default function AdminDashboardPage() {
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
-                                <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                <DropdownMenuItem>
-                                  <Eye className="mr-2 h-4 w-4" />
-                                  View Deck
-                                </DropdownMenuItem>
-                                <DropdownMenuItem>
-                                  <PenLine className="mr-2 h-4 w-4" />
-                                  Edit Deck
-                                </DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                                {deck.status === "Published" ? (
-                                  <DropdownMenuItem>
-                                    <Lock className="mr-2 h-4 w-4" />
-                                    Set to Review
-                                  </DropdownMenuItem>
-                                ) : deck.status === "Under Review" ? (
-                                  <>
-                                    <DropdownMenuItem>
-                                      <CheckCircle2 className="mr-2 h-4 w-4" />
-                                      Approve
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem>
-                                      <Lock className="mr-2 h-4 w-4" />
-                                      Block
-                                    </DropdownMenuItem>
-                                  </>
-                                ) : (
-                                  <DropdownMenuItem>
-                                    <Unlock className="mr-2 h-4 w-4" />
-                                    Unblock
-                                  </DropdownMenuItem>
-                                )}
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem className="text-destructive">
+                                <DropdownMenuItem
+                                  className="text-destructive"
+                                  onClick={() => handleDeleteDeck(deck.id)}
+                                >
                                   <Trash2 className="mr-2 h-4 w-4" />
                                   Delete Deck
                                 </DropdownMenuItem>
