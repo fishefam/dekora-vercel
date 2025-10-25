@@ -1,11 +1,15 @@
-/* eslint-disable @typescript-eslint/no-unused-expressions */
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { DashboardShell } from "@/components/dashboard/shell";
-import { DashboardHeader } from "@/components/dashboard/header";
+import React, { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -27,6 +31,7 @@ import {
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
+  CheckCircle2,
   Eye,
   Filter,
   Lock,
@@ -37,7 +42,7 @@ import {
   Trash2,
   Unlock,
   UserPlus,
-} from "@/components/icons";
+} from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -49,144 +54,396 @@ import {
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-
+import { decks } from "./mocks";
 import {
-  getUsersAction,
+  listUsersAction,
   createUserAction,
-  updateUserRoleAction,
-  updateUserStatusAction,
+  getUserAction,
+  updateUserAction,
+  changeRoleAction,
+  suspendUserAction,
   deleteUserAction,
-  type AdminUser,
 } from "./action";
+import { DashboardShell } from "@/components/dashboard/shell";
+import { DashboardHeader } from "@/components/dashboard/header";
 
-export default function Page() {
-  // table data
-  const [users, setUsers] = useState<AdminUser[]>([]);
-  const [total, setTotal] = useState(0);
-  const [page, setPage] = useState(1);
-  const pageSize = 10;
+export default function AdminDashboardPage() {
+  const [loading, setLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+  const [users, setUsers] = useState<any[]>([]);
+  const [query, setQuery] = useState<string>("");
+  const [perPage] = useState<number>(100);
+  const [page] = useState<number>(1);
 
-  // search & filters
-  const [q, setQ] = useState("");
-  const [qLive, setQLive] = useState("");
-  const [roleFilter, setRoleFilter] = useState<
-    Set<"Admin" | "Curator" | "User">
-  >(new Set());
-  const [statusFilter, setStatusFilter] = useState<
-    Set<"Active" | "Inactive" | "Suspended">
-  >(new Set());
+  // --- filter state (users) ---
+  const [roleFilters, setRoleFilters] = useState({
+    admin: false,
+    user: false,
+  });
+  const [statusFilters, setStatusFilters] = useState({
+    active: false,
+    inactive: false,
+    suspended: false,
+  });
 
-  const [loading, setLoading] = useState(true);
+  // --- filter state (decks/content) ---
+  const [deckFilters, setDeckFilters] = useState({
+    published: false,
+    review: false,
+    blocked: false,
+    reported: false,
+  });
 
-  // add user dialog state
-  const [openAdd, setOpenAdd] = useState(false);
-  const [firstName, setFirst] = useState("");
-  const [lastName, setLast] = useState("");
-  const [email, setEmail] = useState("");
-  const [newRole, setNewRole] = useState<"user" | "curator" | "admin">("user");
+  // --- add user form state ---
+  const [addOpen, setAddOpen] = useState(false);
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [newEmail, setNewEmail] = useState("");
+  const [newRole, setNewRole] = useState<"user" | "admin">("user");
   const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
 
-  // debounced search
+  // --- action modals / selection ---
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [profileDetails, setProfileDetails] = useState<any | null>(null);
+
+  const [editOpen, setEditOpen] = useState(false);
+  const [editState, setEditState] = useState({
+    id: "",
+    email: "",
+    full_name: "",
+    avatar_url: "",
+    status: "",
+  });
+  const [savingEdit, setSavingEdit] = useState(false);
+
+  const [roleOpen, setRoleOpen] = useState(false);
+  const [roleState, setRoleState] = useState<{ id: string; role: string }>({
+    id: "",
+    role: "user",
+  });
+  const [changingRole, setChangingRole] = useState(false);
+
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmAction, setConfirmAction] = useState<{
+    type: "suspend" | "delete";
+    id: string;
+  } | null>(null);
+  const [confirmLoading, setConfirmLoading] = useState(false);
+
   useEffect(() => {
-    const t = setTimeout(() => setQ(qLive), 350);
-    return () => clearTimeout(t);
-  }, [qLive]);
+    let mounted = true;
+    async function fetchUsers() {
+      setLoading(true);
+      setError(null);
+      try {
+        const res = await listUsersAction({ perPage, page });
+        if (!mounted) return;
+        if (res.ok) {
+          // map server AdminUserRow -> UI shape
+          const capitalize = (s?: string | null) =>
+            s && s.length ? s[0].toUpperCase() + s.slice(1) : "User";
 
-  // fetch users
-  const reload = async (newPage = page) => {
+          const mapped = res.data.users.map((u: any) => {
+            const profile = u.profile ?? {};
+            // prefer profile.full_name, else try raw_user_meta_data from auth user
+            const rawFirst = (u as any).raw_user_meta_data?.firstName ?? "";
+            const rawLast = (u as any).raw_user_meta_data?.lastName ?? "";
+            const rawFull = `${rawFirst} ${rawLast}`.trim();
+            const name = profile.full_name ?? rawFull ?? u.email ?? u.id;
+            const email = u.email ?? profile.email ?? "";
+            const avatar = profile.avatar_url ?? undefined;
+            const role = capitalize(profile.role ?? "user");
+            // Last Active => human readable datetime
+            const lastActiveRaw =
+              profile.last_active_at ?? u.last_sign_in_at ?? null;
+            const lastActive = lastActiveRaw
+              ? new Date(lastActiveRaw).toLocaleString()
+              : "-";
+            const joined = u.created_at
+              ? new Date(u.created_at).toLocaleDateString()
+              : "-";
+            return {
+              id: u.id,
+              avatar,
+              name,
+              email,
+              rawFull, // full name from auth.raw_user_meta_data
+              role,
+              lastActive,
+              decks: "-", // placeholder
+              joined,
+            };
+          });
+          setUsers(mapped);
+        } else {
+          setError(res.error ?? "Failed to load users");
+        }
+      } catch (e: any) {
+        setError(e?.message ?? "Failed to load users");
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    }
+
+    fetchUsers();
+    return () => {
+      mounted = false;
+    };
+  }, [perPage, page]);
+
+  // helpers
+  const refreshList = async () => {
     setLoading(true);
-    const roles = Array.from(roleFilter);
-    const statuses = Array.from(statusFilter);
-    const res = await getUsersAction({
-      q,
-      roles,
-      statuses,
-      page: newPage,
-      pageSize,
-    });
-    setUsers(res.rows);
-    setTotal(res.total);
-    setPage(res.page ?? newPage);
-    setLoading(false);
-  };
-
-  useEffect(() => {
-    reload(1);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [q, roleFilter, statusFilter]);
-
-  // filter handlers
-  const toggleRole = (r: "Admin" | "Curator" | "User") =>
-    setRoleFilter((s) => {
-      const n = new Set(s);
-      n.has(r) ? n.delete(r) : n.add(r);
-      return n;
-    });
-
-  const toggleStatus = (s0: "Active" | "Inactive" | "Suspended") =>
-    setStatusFilter((s) => {
-      const n = new Set(s);
-      n.has(s0) ? n.delete(s0) : n.add(s0);
-      return n;
-    });
-
-  // actions
-  const onCreateUser = async () => {
-    setCreating(true);
-    const ok = await createUserAction({
-      firstName,
-      lastName,
-      email,
-      role: newRole,
-    });
-    setCreating(false);
-    if (ok.ok) {
-      setOpenAdd(false);
-      setFirst("");
-      setLast("");
-      setEmail("");
-      setNewRole("user");
-      reload(1);
+    try {
+      const res = await listUsersAction({ perPage, page });
+      if (res.ok) {
+        const capitalize = (s?: string | null) =>
+          s && s.length ? s[0].toUpperCase() + s.slice(1) : "User";
+        setUsers(
+          res.data.users.map((u: any) => {
+            const profile = u.profile ?? {};
+            const rawFirst = (u as any).raw_user_meta_data?.firstName ?? "";
+            const rawLast = (u as any).raw_user_meta_data?.lastName ?? "";
+            const rawFull = `${rawFirst} ${rawLast}`.trim();
+            const name = profile.full_name ?? rawFull ?? u.email ?? u.id;
+            const email = u.email ?? profile.email ?? "";
+            const avatar = profile.avatar_url ?? undefined;
+            const role = capitalize(profile.role ?? "user");
+            const lastActiveRaw =
+              profile.last_active_at ?? u.last_sign_in_at ?? null;
+            const lastActive = lastActiveRaw
+              ? new Date(lastActiveRaw).toLocaleString()
+              : "-";
+            const joined = u.created_at
+              ? new Date(u.created_at).toLocaleDateString()
+              : "-";
+            return {
+              id: u.id,
+              avatar,
+              name,
+              email,
+              rawFull,
+              role,
+              lastActive,
+              decks: "-",
+              joined,
+            };
+          })
+        );
+      } else {
+        setError(res.error ?? "Failed to load users");
+      }
+    } catch (e: any) {
+      setError(e?.message ?? "Failed to load users");
+    } finally {
+      setLoading(false);
     }
   };
 
-  const onChangeRole = async (
-    u: AdminUser,
-    roleUi: "Admin" | "Curator" | "User"
-  ) => {
-    const roleDb =
-      roleUi === "Admin" ? "admin" : roleUi === "Curator" ? "curator" : "user";
-    await updateUserRoleAction(u.id, roleDb);
-    reload();
-  };
+  // compose filtered users using query + filters
+  const filteredUsers = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    const selectedRoles = Object.entries(roleFilters)
+      .filter(([, v]) => v)
+      .map(([k]) => k); // e.g. ["admin","user"]
+    const selectedStatuses = Object.entries(statusFilters)
+      .filter(([, v]) => v)
+      .map(([k]) => k); // can still filter by status if needed
 
-  const onToggleActive = async (u: AdminUser) => {
-    const next = u.status === "Active" ? "suspended" : "active";
-    await updateUserStatusAction(u.id, next as "active" | "suspended");
-    reload();
-  };
+    return users.filter((u) => {
+      // query match
+      if (
+        q &&
+        !(
+          (u.email ?? "").toLowerCase().includes(q) ||
+          (u.id ?? "").toLowerCase().includes(q) ||
+          (u.name ?? "").toLowerCase().includes(q)
+        )
+      ) {
+        return false;
+      }
 
-  const onDelete = async (u: AdminUser) => {
-    if (!confirm(`Delete ${u.name}? This cannot be undone.`)) return;
-    await deleteUserAction(u.id);
-    reload();
-  };
+      // role filter
+      if (selectedRoles.length > 0) {
+        const userRole = (u.role ?? "user").toLowerCase();
+        if (!selectedRoles.includes(userRole)) return false;
+      }
 
-  const totalPages = useMemo(
-    () => Math.max(1, Math.ceil(total / pageSize)),
-    [total]
-  );
+      // status filter (note: UI no longer shows status column but filter remains)
+      if (selectedStatuses.length > 0) {
+        // best-effort: derive from user raw data presence
+        const userStatus = (u.status ?? "inactive").toLowerCase();
+        if (!selectedStatuses.includes(userStatus)) return false;
+      }
+
+      return true;
+    });
+  }, [users, query, roleFilters, statusFilters]);
+
+  const filteredDecks = useMemo(() => {
+    const selected = Object.entries(deckFilters)
+      .filter(([, v]) => v)
+      .map(([k]) => k);
+    if (selected.length === 0) return decks;
+    return decks.filter((d) => {
+      if (selected.includes("reported") && d.reported) return true;
+      if (selected.includes("published") && d.status === "Published")
+        return true;
+      if (selected.includes("review") && d.status === "Under Review")
+        return true;
+      if (selected.includes("blocked") && d.status === "Blocked") return true;
+      return false;
+    });
+  }, [deckFilters]);
+
+  async function handleCreateUser(e?: React.FormEvent) {
+    e?.preventDefault?.();
+    setCreating(true);
+    setCreateError(null);
+    try {
+      const fullName =
+        (firstName || lastName) && `${firstName} ${lastName}`.trim();
+      const res = await createUserAction({
+        email: newEmail,
+        full_name: fullName ?? undefined,
+        role: newRole,
+      });
+      if (!res.ok) {
+        setCreateError(res.error ?? "Failed to create user");
+        return;
+      }
+      await refreshList();
+      setFirstName("");
+      setLastName("");
+      setNewEmail("");
+      setNewRole("user");
+      setAddOpen(false);
+    } catch (err: any) {
+      setCreateError(err?.message ?? "Failed to create user");
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  // Actions from dropdown
+  async function onViewProfile(id: string) {
+    setProfileOpen(true);
+    setProfileDetails(null);
+    setSelectedId(id);
+    try {
+      const res = await getUserAction(id);
+      if (res.ok) setProfileDetails(res.data);
+      else setProfileDetails({ error: res.error });
+    } catch {
+      setProfileDetails({ error: "Failed to load profile" });
+    }
+  }
+
+  function onOpenEdit(id: string) {
+    const u = users.find((x) => x.id === id);
+    setEditState({
+      id,
+      email: u?.email ?? "",
+      full_name: u?.name ?? "",
+      avatar_url: u?.avatar ?? "",
+      status: u?.status ?? "Active",
+    });
+    setEditOpen(true);
+  }
+
+  async function saveEdit(e?: React.FormEvent) {
+    e?.preventDefault?.();
+    setSavingEdit(true);
+    try {
+      const { id, email, full_name, avatar_url, status } = editState;
+      const res = await updateUserAction({
+        id,
+        email,
+        full_name,
+        avatar_url,
+        status,
+      });
+      if (!res.ok) {
+        setError(res.error ?? "Failed to save user");
+      } else {
+        await refreshList();
+        setEditOpen(false);
+      }
+    } catch (err: any) {
+      setError(err?.message ?? "Failed to save user");
+    } finally {
+      setSavingEdit(false);
+    }
+  }
+
+  function onOpenChangeRole(id: string, currentRole = "user") {
+    setRoleState({ id, role: currentRole.toLowerCase() });
+    setRoleOpen(true);
+  }
+
+  async function saveRoleChange(e?: React.FormEvent) {
+    e?.preventDefault?.();
+    setChangingRole(true);
+    try {
+      const res = await changeRoleAction({
+        id: roleState.id,
+        role: roleState.role,
+      });
+      if (!res.ok) setError(res.error ?? "Failed to change role");
+      else {
+        await refreshList();
+        setRoleOpen(false);
+      }
+    } catch (err: any) {
+      setError(err?.message ?? "Failed to change role");
+    } finally {
+      setChangingRole(false);
+    }
+  }
+
+  function onConfirm(action: "suspend" | "delete", id: string) {
+    setConfirmAction({ type: action, id });
+    setConfirmOpen(true);
+  }
+
+  async function executeConfirm() {
+    if (!confirmAction) return;
+    setConfirmLoading(true);
+    try {
+      const { type, id } = confirmAction;
+      if (type === "suspend") {
+        const res = await suspendUserAction({ id });
+        if (!res.ok) setError(res.error ?? "Failed to suspend");
+        else await refreshList();
+      } else if (type === "delete") {
+        const res = await deleteUserAction(id);
+        if (!res.ok) setError(res.error ?? "Failed to delete");
+        else await refreshList();
+      }
+      setConfirmOpen(false);
+    } catch (err: any) {
+      setError(err?.message ?? "Action failed");
+    } finally {
+      setConfirmLoading(false);
+      setConfirmAction(null);
+    }
+  }
 
   return (
     <DashboardShell>
-      <DashboardHeader heading="Admin Dashboard" text="Manage users">
-        <Dialog open={openAdd} onOpenChange={setOpenAdd}>
+      <DashboardHeader
+        heading="Admin Dashboard"
+        text="Manage users, content, and platform settings."
+      >
+        {/* Add user dialog (unchanged) */}
+        <Dialog open={addOpen} onOpenChange={setAddOpen}>
           <DialogTrigger asChild>
             <Button>
               <UserPlus className="mr-2 h-4 w-4" />
@@ -194,328 +451,724 @@ export default function Page() {
             </Button>
           </DialogTrigger>
           <DialogContent>
+            <form onSubmit={handleCreateUser}>
+              <DialogHeader>
+                <DialogTitle>Add New User</DialogTitle>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="first-name">First name</Label>
+                    <Input
+                      id="first-name"
+                      value={firstName}
+                      onChange={(e) => setFirstName(e.target.value)}
+                      placeholder="John"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="last-name">Last name</Label>
+                    <Input
+                      id="last-name"
+                      value={lastName}
+                      onChange={(e) => setLastName(e.target.value)}
+                      placeholder="Doe"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    value={newEmail}
+                    onChange={(e) => setNewEmail(e.target.value)}
+                    placeholder="john.doe@example.com"
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="role">Role</Label>
+                  <Select
+                    value={newRole}
+                    onValueChange={(v) => setNewRole(v as "user" | "admin")}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select role" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="user">User</SelectItem>
+                      <SelectItem value="admin">Admin</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Permissions (informational)</Label>
+                  <div className="space-y-2">
+                    <div className="flex items-center space-x-2">
+                      <Checkbox id="perm-manage-users" />
+                      <Label htmlFor="perm-manage-users">Manage Users</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Checkbox id="perm-moderate-content" defaultChecked />
+                      <Label htmlFor="perm-moderate-content">
+                        Moderate Content
+                      </Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Checkbox id="perm-view-analytics" defaultChecked />
+                      <Label htmlFor="perm-view-analytics">
+                        View Analytics
+                      </Label>
+                    </div>
+                  </div>
+                </div>
+                {createError && (
+                  <div className="text-destructive">{createError}</div>
+                )}
+              </div>
+              <DialogFooter>
+                <Button type="submit" disabled={creating}>
+                  {creating ? "Creating..." : "Create User"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+
+        {/* Profile dialog */}
+        <Dialog
+          open={profileOpen}
+          onOpenChange={(open) => {
+            if (!open) setProfileDetails(null);
+            setProfileOpen(open);
+          }}
+        >
+          <DialogContent>
             <DialogHeader>
-              <DialogTitle>Add New User</DialogTitle>
-              <DialogDescription>
-                Create a new user account with specified role and permissions.
-              </DialogDescription>
+              <DialogTitle>Profile</DialogTitle>
             </DialogHeader>
-            <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-2 gap-4">
+            <div className="py-4">
+              {!profileDetails && <div>Loading...</div>}
+              {profileDetails?.error && (
+                <div className="text-destructive">{profileDetails.error}</div>
+              )}
+              {profileDetails && !profileDetails.error && (
+                <div>
+                  <div>
+                    <strong>ID:</strong> {profileDetails.id}
+                  </div>
+                  <div>
+                    <strong>Email:</strong> {profileDetails.email}
+                  </div>
+                  <div>
+                    <strong>Name:</strong>{" "}
+                    {profileDetails.profile?.full_name ?? "-"}
+                  </div>
+                  <div>
+                    <strong>Role:</strong> {profileDetails.profile?.role ?? "-"}
+                  </div>
+                  <div>
+                    <strong>Last active:</strong>{" "}
+                    {profileDetails.profile?.last_active_at
+                      ? new Date(
+                          profileDetails.profile.last_active_at
+                        ).toLocaleString()
+                      : profileDetails.last_sign_in_at
+                      ? new Date(
+                          profileDetails.last_sign_in_at
+                        ).toLocaleString()
+                      : "-"}
+                  </div>
+                </div>
+              )}
+            </div>
+            <DialogFooter>
+              <Button onClick={() => setProfileOpen(false)}>Close</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Edit user dialog */}
+        <Dialog open={editOpen} onOpenChange={setEditOpen}>
+          <DialogContent>
+            <form onSubmit={saveEdit}>
+              <DialogHeader>
+                <DialogTitle>Edit User</DialogTitle>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
                 <div className="space-y-2">
-                  <Label htmlFor="first-name">First name</Label>
+                  <Label>Email</Label>
                   <Input
-                    id="first-name"
-                    placeholder="John"
-                    value={firstName}
-                    onChange={(e) => setFirst(e.target.value)}
+                    value={editState.email}
+                    onChange={(e) =>
+                      setEditState((s) => ({ ...s, email: e.target.value }))
+                    }
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="last-name">Last name</Label>
+                  <Label>Full name</Label>
                   <Input
-                    id="last-name"
-                    placeholder="Doe"
-                    value={lastName}
-                    onChange={(e) => setLast(e.target.value)}
+                    value={editState.full_name}
+                    onChange={(e) =>
+                      setEditState((s) => ({ ...s, full_name: e.target.value }))
+                    }
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Avatar URL</Label>
+                  <Input
+                    value={editState.avatar_url}
+                    onChange={(e) =>
+                      setEditState((s) => ({
+                        ...s,
+                        avatar_url: e.target.value,
+                      }))
+                    }
                   />
                 </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="john.doe@example.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="role">Role</Label>
+              <DialogFooter>
+                <Button type="submit" disabled={savingEdit}>
+                  {savingEdit ? "Saving..." : "Save"}
+                </Button>
+                <Button variant="outline" onClick={() => setEditOpen(false)}>
+                  Cancel
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+
+        {/* Change role dialog */}
+        <Dialog open={roleOpen} onOpenChange={setRoleOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Change Role</DialogTitle>
+            </DialogHeader>
+            <form onSubmit={saveRoleChange}>
+              <div className="py-4">
+                <Label>Role</Label>
                 <Select
-                  value={newRole}
-                  onValueChange={(v) => setNewRole(v as any)}
+                  value={roleState.role}
+                  onValueChange={(v) =>
+                    setRoleState((s) => ({ ...s, role: v }))
+                  }
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select role" />
+                    <SelectValue placeholder="Role" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="user">User</SelectItem>
-                    <SelectItem value="curator">Curator</SelectItem>
                     <SelectItem value="admin">Admin</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
-              {/* Permissions UI placeholder – wire as needed */}
+              <DialogFooter>
+                <Button type="submit" disabled={changingRole}>
+                  {changingRole ? "Saving..." : "Save"}
+                </Button>
+                <Button variant="outline" onClick={() => setRoleOpen(false)}>
+                  Cancel
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+
+        {/* Confirm dialog (suspend/delete) */}
+        <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Confirm</DialogTitle>
+            </DialogHeader>
+            <div className="py-4">
+              <div>
+                {confirmAction?.type === "suspend" && (
+                  <div>Are you sure you want to suspend this user?</div>
+                )}
+                {confirmAction?.type === "delete" && (
+                  <div className="text-destructive">
+                    This will permanently delete the user. Continue?
+                  </div>
+                )}
+              </div>
             </div>
             <DialogFooter>
-              <Button type="button" onClick={onCreateUser} disabled={creating}>
-                {creating ? "Creating..." : "Create User"}
+              <Button onClick={executeConfirm} disabled={confirmLoading}>
+                {confirmLoading ? "Working..." : "Confirm"}
+              </Button>
+              <Button variant="outline" onClick={() => setConfirmOpen(false)}>
+                Cancel
               </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
       </DashboardHeader>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>User Management</CardTitle>
-        </CardHeader>
+      <div className="px-6 pb-8">
+        <Tabs defaultValue="users" className="space-y-6">
+          <TabsList className="mb-0">
+            <TabsTrigger value="users">User Management</TabsTrigger>
+            <TabsTrigger value="content">Content Moderation</TabsTrigger>
+          </TabsList>
 
-        <CardContent>
-          <div className="mb-4 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className="relative">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                  type="search"
-                  placeholder="Search users..."
-                  className="w-[250px] pl-8"
-                  value={qLive}
-                  onChange={(e) => setQLive(e.target.value)}
-                />
-              </div>
+          <TabsContent value="users" className="space-y-4">
+            <Card className="shadow-sm rounded-lg overflow-hidden">
+              <CardHeader className="px-6 py-4 bg-white">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-xl">User Management</CardTitle>
+                    <CardDescription className="text-sm text-muted-foreground">
+                      View and manage all users on the platform.
+                    </CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
 
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm">
-                    <Filter className="mr-2 h-4 w-4" />
-                    Filter
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56">
-                  <DropdownMenuLabel>Filter by Role</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  {(["Admin", "Curator", "User"] as const).map((r) => (
-                    <DropdownMenuItem
-                      key={r}
-                      onClick={(e) => e.preventDefault()}
-                    >
-                      <div className="flex items-center space-x-2">
-                        <Checkbox
-                          id={`filter-${r.toLowerCase()}`}
-                          checked={roleFilter.has(r)}
-                          onCheckedChange={() => toggleRole(r)}
-                        />
-                        <Label htmlFor={`filter-${r.toLowerCase()}`}>{r}</Label>
-                      </div>
-                    </DropdownMenuItem>
-                  ))}
-                  <DropdownMenuSeparator />
-                  <DropdownMenuLabel>Filter by Status</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  {(["Active", "Inactive", "Suspended"] as const).map((s) => (
-                    <DropdownMenuItem
-                      key={s}
-                      onClick={(e) => e.preventDefault()}
-                    >
-                      <div className="flex items-center space-x-2">
-                        <Checkbox
-                          id={`filter-${s.toLowerCase()}`}
-                          checked={statusFilter.has(s)}
-                          onCheckedChange={() => toggleStatus(s)}
-                        />
-                        <Label htmlFor={`filter-${s.toLowerCase()}`}>{s}</Label>
-                      </div>
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-          </div>
+              <CardContent className="p-6">
+                <div className="mb-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        type="search"
+                        value={query}
+                        onChange={(e) => setQuery(e.target.value)}
+                        placeholder="Search users by name, email or id..."
+                        className="pl-10 w-[320px]"
+                      />
+                    </div>
 
-          <div className="rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>User</TableHead>
-                  <TableHead>Role</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Last Active</TableHead>
-                  <TableHead>Decks</TableHead>
-                  <TableHead>Joined</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {loading ? (
-                  <TableRow>
-                    <TableCell
-                      colSpan={7}
-                      className="text-center py-10 text-sm text-muted-foreground"
-                    >
-                      Loading…
-                    </TableCell>
-                  </TableRow>
-                ) : users.length === 0 ? (
-                  <TableRow>
-                    <TableCell
-                      colSpan={7}
-                      className="text-center py-10 text-sm text-muted-foreground"
-                    >
-                      No users found.
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  users.map((user) => (
-                    <TableRow key={user.id}>
-                      <TableCell>
-                        <div className="flex items-center gap-3">
-                          <Avatar className="h-8 w-8">
-                            <AvatarImage
-                              src={user.avatar ?? undefined}
-                              alt={user.name}
-                            />
-                            <AvatarFallback>
-                              {user.name
-                                .split(" ")
-                                .map((n) => n[0])
-                                .join("")
-                                .slice(0, 2)
-                                .toUpperCase()}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div className="flex flex-col">
-                            <span className="font-medium">{user.name}</span>
-                            <span className="text-xs text-muted-foreground">
-                              {user.email}
-                            </span>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="outline" size="sm" className="gap-2">
+                          <Filter className="h-4 w-4" />
+                          Filters
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-64">
+                        <div className="px-3 py-2">
+                          <DropdownMenuLabel className="text-sm font-medium">
+                            Filter by role
+                          </DropdownMenuLabel>
+                          <div className="mt-2 space-y-2">
+                            <label className="flex items-center gap-2">
+                              <Checkbox
+                                id="filter-admin"
+                                checked={roleFilters.admin}
+                                onCheckedChange={(v) =>
+                                  setRoleFilters((p) => ({
+                                    ...p,
+                                    admin: Boolean(v),
+                                  }))
+                                }
+                              />
+                              <span className="text-sm">Admin</span>
+                            </label>
+                            <label className="flex items-center gap-2">
+                              <Checkbox
+                                id="filter-user"
+                                checked={roleFilters.user}
+                                onCheckedChange={(v) =>
+                                  setRoleFilters((p) => ({
+                                    ...p,
+                                    user: Boolean(v),
+                                  }))
+                                }
+                              />
+                              <span className="text-sm">User</span>
+                            </label>
+                          </div>
+
+                          <div className="mt-4 flex justify-end gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setRoleFilters({ admin: false, user: false });
+                                setStatusFilters({
+                                  active: false,
+                                  inactive: false,
+                                  suspended: false,
+                                });
+                              }}
+                            >
+                              Clear
+                            </Button>
                           </div>
                         </div>
-                      </TableCell>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                </div>
 
-                      <TableCell>
-                        <Badge
-                          variant={
-                            user.role === "Admin"
-                              ? "default"
-                              : user.role === "Curator"
-                              ? "secondary"
-                              : "outline"
-                          }
-                        >
-                          {user.role}
-                        </Badge>
-                      </TableCell>
+                {loading && (
+                  <div className="p-4 text-sm text-muted-foreground">
+                    Loading users...
+                  </div>
+                )}
+                {error && (
+                  <div className="p-4 text-sm text-red-600">{error}</div>
+                )}
 
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <div
-                            className={`h-2 w-2 rounded-full ${
-                              user.status === "Active"
-                                ? "bg-green-500"
-                                : user.status === "Inactive"
-                                ? "bg-yellow-500"
-                                : "bg-red-500"
-                            }`}
-                          />
-                          <span>{user.status}</span>
+                <div className="rounded-lg overflow-hidden border border-gray-100 shadow">
+                  <Table className="min-w-full bg-white">
+                    <TableHeader className="bg-gray-50">
+                      <TableRow>
+                        <TableHead>User</TableHead>
+                        <TableHead>Role</TableHead>
+                        <TableHead>Last Active</TableHead>
+                        <TableHead>Decks</TableHead>
+                        <TableHead>Joined</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredUsers.map((user) => (
+                        <TableRow key={user.id} className="hover:bg-gray-50">
+                          <TableCell>
+                            <div className="flex items-center gap-3">
+                              <Avatar className="h-9 w-9 ring-1 ring-gray-100">
+                                <AvatarImage
+                                  src={user.avatar}
+                                  alt={user.name}
+                                />
+                                <AvatarFallback className="text-sm">
+                                  {user.name
+                                    .split(" ")
+                                    .map((n: string) => n[0])
+                                    .join("")}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div className="flex flex-col">
+                                <span className="font-medium">{user.name}</span>
+                                <span className="text-xs text-muted-foreground">
+                                  {user.email}
+                                </span>
+                                {user.rawFull && (
+                                  <span className="text-xs text-muted-foreground">
+                                    {user.rawFull}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </TableCell>
+
+                          <TableCell>
+                            <Badge
+                              variant={
+                                user.role === "Admin" ? "default" : "outline"
+                              }
+                              className="px-2 py-1"
+                            >
+                              {user.role}
+                            </Badge>
+                          </TableCell>
+
+                          <TableCell className="text-sm">
+                            {user.lastActive}
+                          </TableCell>
+                          <TableCell className="text-sm">
+                            {user.decks}
+                          </TableCell>
+                          <TableCell className="text-sm">
+                            {user.joined}
+                          </TableCell>
+
+                          <TableCell className="text-right">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="p-1"
+                                >
+                                  <MoreHorizontal className="h-4 w-4" />
+                                  <span className="sr-only">Actions</span>
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="w-56">
+                                <DropdownMenuLabel>Actions</DropdownMenuLabel>
+
+                                <DropdownMenuItem
+                                  onClick={() => onViewProfile(user.id)}
+                                  className="flex items-center gap-2"
+                                >
+                                  <Eye className="h-4 w-4" />
+                                  View Profile
+                                </DropdownMenuItem>
+
+                                <DropdownMenuItem
+                                  onClick={() => onOpenEdit(user.id)}
+                                  className="flex items-center gap-2"
+                                >
+                                  <PenLine className="h-4 w-4" />
+                                  Edit User
+                                </DropdownMenuItem>
+
+                                <DropdownMenuSeparator />
+
+                                <DropdownMenuItem
+                                  onClick={() =>
+                                    onOpenChangeRole(user.id, user.role)
+                                  }
+                                  className="flex items-center gap-2"
+                                >
+                                  <Shield className="h-4 w-4" />
+                                  Change Role
+                                </DropdownMenuItem>
+
+                                {user.lastActive !== "-" && (
+                                  <DropdownMenuItem
+                                    onClick={() =>
+                                      onConfirm("suspend", user.id)
+                                    }
+                                    className="flex items-center gap-2"
+                                  >
+                                    <Lock className="h-4 w-4" />
+                                    Suspend User
+                                  </DropdownMenuItem>
+                                )}
+
+                                <DropdownMenuSeparator />
+
+                                <DropdownMenuItem
+                                  className="text-destructive flex items-center gap-2"
+                                  onClick={() => onConfirm("delete", user.id)}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                  Delete User
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+
+                <div className="flex items-center justify-end space-x-2 py-4">
+                  <Button variant="ghost" size="sm" className="px-4">
+                    Previous
+                  </Button>
+                  <Button variant="ghost" size="sm" className="px-4">
+                    Next
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="content" className="space-y-4">
+            <Card className="shadow-sm rounded-lg overflow-hidden">
+              <CardHeader className="px-6 py-4 bg-white">
+                <CardTitle className="text-xl">Content Moderation</CardTitle>
+                <CardDescription className="text-sm text-muted-foreground">
+                  Review and moderate user-created content.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="p-6">
+                <div className="mb-4 flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        type="search"
+                        placeholder="Search decks..."
+                        className="pl-10 w-[320px]"
+                      />
+                    </div>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="outline" size="sm">
+                          Filter
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-56">
+                        <DropdownMenuLabel>Filter by</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        <div className="p-3 space-y-3">
+                          <label className="flex items-center gap-2">
+                            <Checkbox
+                              id="filter-published"
+                              checked={deckFilters.published}
+                              onCheckedChange={(v) =>
+                                setDeckFilters((p) => ({
+                                  ...p,
+                                  published: Boolean(v),
+                                }))
+                              }
+                            />
+                            <span>Published</span>
+                          </label>
+                          <label className="flex items-center gap-2">
+                            <Checkbox
+                              id="filter-review"
+                              checked={deckFilters.review}
+                              onCheckedChange={(v) =>
+                                setDeckFilters((p) => ({
+                                  ...p,
+                                  review: Boolean(v),
+                                }))
+                              }
+                            />
+                            <span>Under Review</span>
+                          </label>
+                          <label className="flex items-center gap-2">
+                            <Checkbox
+                              id="filter-blocked"
+                              checked={deckFilters.blocked}
+                              onCheckedChange={(v) =>
+                                setDeckFilters((p) => ({
+                                  ...p,
+                                  blocked: Boolean(v),
+                                }))
+                              }
+                            />
+                            <span>Blocked</span>
+                          </label>
+                          <label className="flex items-center gap-2">
+                            <Checkbox
+                              id="filter-reported"
+                              checked={deckFilters.reported}
+                              onCheckedChange={(v) =>
+                                setDeckFilters((p) => ({
+                                  ...p,
+                                  reported: Boolean(v),
+                                }))
+                              }
+                            />
+                            <span>Reported</span>
+                          </label>
                         </div>
-                      </TableCell>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                </div>
 
-                      <TableCell>{user.lastActive ?? "—"}</TableCell>
-                      <TableCell>{user.decks}</TableCell>
-                      <TableCell>{user.joined}</TableCell>
-
-                      <TableCell className="text-right">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm">
-                              <MoreHorizontal className="h-4 w-4" />
-                              <span className="sr-only">Actions</span>
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                            <DropdownMenuItem>
-                              <Eye className="mr-2 h-4 w-4" />
-                              View Profile
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() =>
-                                onChangeRole(
-                                  user,
-                                  user.role === "Admin" ? "User" : "Admin"
-                                )
+                <div className="rounded-lg overflow-hidden border border-gray-100 shadow">
+                  <Table className="min-w-full bg-white">
+                    <TableHeader className="bg-gray-50">
+                      <TableRow>
+                        <TableHead>Deck Name</TableHead>
+                        <TableHead>Creator</TableHead>
+                        <TableHead>Cards</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Views</TableHead>
+                        <TableHead>Created</TableHead>
+                        <TableHead>Last Updated</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredDecks.map((deck) => (
+                        <TableRow
+                          key={deck.id}
+                          className={`hover:bg-gray-50 ${
+                            deck.reported ? "bg-red-50" : ""
+                          }`}
+                        >
+                          <TableCell>
+                            <div className="font-medium">
+                              {deck.name}
+                              {deck.reported && (
+                                <Badge variant="destructive" className="ml-2">
+                                  Reported
+                                </Badge>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell>{deck.creator}</TableCell>
+                          <TableCell>{deck.cards}</TableCell>
+                          <TableCell>
+                            <Badge
+                              variant={
+                                deck.status === "Published"
+                                  ? "default"
+                                  : deck.status === "Under Review"
+                                  ? "secondary"
+                                  : "destructive"
                               }
                             >
-                              <Shield className="mr-2 h-4 w-4" />
-                              {user.role === "Admin"
-                                ? "Make User"
-                                : "Make Admin"}
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() => onChangeRole(user, "Curator")}
-                            >
-                              <PenLine className="mr-2 h-4 w-4" />
-                              Make Curator
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            {user.status === "Active" ? (
-                              <DropdownMenuItem
-                                onClick={() => onToggleActive(user)}
-                              >
-                                <Lock className="mr-2 h-4 w-4" />
-                                Suspend User
-                              </DropdownMenuItem>
-                            ) : (
-                              <DropdownMenuItem
-                                onClick={() => onToggleActive(user)}
-                              >
-                                <Unlock className="mr-2 h-4 w-4" />
-                                Activate User
-                              </DropdownMenuItem>
-                            )}
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                              className="text-destructive"
-                              onClick={() => onDelete(user)}
-                            >
-                              <Trash2 className="mr-2 h-4 w-4" />
-                              Delete User
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
+                              {deck.status}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>{deck.views}</TableCell>
+                          <TableCell>{deck.created}</TableCell>
+                          <TableCell>{deck.lastUpdated}</TableCell>
+                          <TableCell className="text-right">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="p-1"
+                                >
+                                  <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                                <DropdownMenuItem>
+                                  <Eye className="mr-2 h-4 w-4" />
+                                  View Deck
+                                </DropdownMenuItem>
+                                <DropdownMenuItem>
+                                  <PenLine className="mr-2 h-4 w-4" />
+                                  Edit Deck
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                {deck.status === "Published" ? (
+                                  <DropdownMenuItem>
+                                    <Lock className="mr-2 h-4 w-4" />
+                                    Set to Review
+                                  </DropdownMenuItem>
+                                ) : deck.status === "Under Review" ? (
+                                  <>
+                                    <DropdownMenuItem>
+                                      <CheckCircle2 className="mr-2 h-4 w-4" />
+                                      Approve
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem>
+                                      <Lock className="mr-2 h-4 w-4" />
+                                      Block
+                                    </DropdownMenuItem>
+                                  </>
+                                ) : (
+                                  <DropdownMenuItem>
+                                    <Unlock className="mr-2 h-4 w-4" />
+                                    Unblock
+                                  </DropdownMenuItem>
+                                )}
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem className="text-destructive">
+                                  <Trash2 className="mr-2 h-4 w-4" />
+                                  Delete Deck
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
 
-          <div className="flex items-center justify-end space-x-2 py-4">
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={page <= 1}
-              onClick={() => {
-                const p = Math.max(1, page - 1);
-                setPage(p);
-                reload(p);
-              }}
-            >
-              Previous
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={page >= totalPages}
-              onClick={() => {
-                const p = Math.min(totalPages, page + 1);
-                setPage(p);
-                reload(p);
-              }}
-            >
-              Next
-            </Button>
-            <span className="text-xs text-muted-foreground">
-              {page} / {totalPages}
-            </span>
-          </div>
-        </CardContent>
-      </Card>
+                <div className="flex items-center justify-end space-x-2 py-4">
+                  <Button variant="ghost" size="sm">
+                    Previous
+                  </Button>
+                  <Button variant="ghost" size="sm">
+                    Next
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+      </div>
     </DashboardShell>
   );
 }
