@@ -1,6 +1,9 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import { DashboardHeader } from "@/components/dashboard/header";
+import { DashboardShell } from "@/components/dashboard/shell";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -9,40 +12,16 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
-  CheckCircle2,
-  Eye,
-  Filter,
-  Lock,
-  MoreHorizontal,
-  PenLine,
-  Search,
-  Shield,
-  Trash2,
-  Unlock,
-  UserPlus,
-} from "lucide-react";
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -51,33 +30,43 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
-  listDecksAction,
-  approveDeckAction,
-  setDeckReviewAction,
-  blockDeckAction,
-  unblockDeckAction,
-  deleteDeckAction,
-} from "./deck-moderation.action";
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  listUsersAction,
-  createUserAction,
-  getUserAction,
-  updateUserAction,
+  Eye,
+  Filter,
+  MoreHorizontal,
+  Search,
+  Shield,
+  Trash2,
+  UserPlus,
+} from "lucide-react";
+import React, { useEffect, useMemo, useState } from "react";
+import {
   changeRoleAction,
-  suspendUserAction,
+  createUserAction,
   deleteUserAction,
+  getUserAction,
+  listUsersAction,
+  suspendUserAction,
 } from "./action";
-import { DashboardShell } from "@/components/dashboard/shell";
-import { DashboardHeader } from "@/components/dashboard/header";
+import { deleteDeckAction, listDecksAction } from "./deck-moderation.action";
 
 export default function AdminDashboardPage() {
   // ...existing user-management state/hooks...
@@ -100,7 +89,7 @@ export default function AdminDashboardPage() {
   });
 
   // --- filter state (decks/content) ---
-  const [deckFilters, setDeckFilters] = useState({
+  const [deckFilters] = useState({
     published: false,
     review: false,
     blocked: false,
@@ -122,19 +111,9 @@ export default function AdminDashboardPage() {
   const [createError, setCreateError] = useState<string | null>(null);
 
   // --- action modals / selection ---
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [, setSelectedId] = useState<string | null>(null);
   const [profileOpen, setProfileOpen] = useState(false);
   const [profileDetails, setProfileDetails] = useState<any | null>(null);
-
-  const [editOpen, setEditOpen] = useState(false);
-  const [editState, setEditState] = useState({
-    id: "",
-    email: "",
-    full_name: "",
-    avatar_url: "",
-    status: "",
-  });
-  const [savingEdit, setSavingEdit] = useState(false);
 
   const [roleOpen, setRoleOpen] = useState(false);
   const [roleState, setRoleState] = useState<{ id: string; role: string }>({
@@ -366,152 +345,6 @@ export default function AdminDashboardPage() {
     };
   }, [deckFilters, deckQuery]);
 
-  // deck moderation actions
-  async function handleApprove(deckId: string) {
-    setDecksLoading(true);
-    try {
-      const res = await approveDeckAction(deckId);
-      if (!res.ok) setDecksError(res.error ?? "Failed to approve");
-      await Promise.resolve(); // allow re-render
-    } finally {
-      // refresh
-      const status = getDeckStatusFromFilters();
-      const r = await listDecksAction({ perPage: 50, page: 1, status });
-      if (r.ok) {
-        const mapped = r.data.decks.map((d: any) => ({
-          id: d.id,
-          name: d.name,
-          description: d.description,
-          creatorName: d.creator?.full_name ?? d.creator?.email ?? "Unknown",
-          creatorEmail: d.creator?.email ?? "",
-          flashcards_count: d.flashcards_count ?? 0,
-          statusLabel: d.is_archived
-            ? "Blocked"
-            : d.is_public
-            ? "Published"
-            : "Under Review",
-          is_public: Boolean(d.is_public),
-          is_archived: Boolean(d.is_archived),
-          study_count: d.study_count ?? 0,
-          created_at: d.created_at,
-          updated_at: d.updated_at,
-          reported: Boolean(d.reported),
-          raw: d,
-        }));
-        setDecksList(mapped);
-      }
-      setDecksLoading(false);
-    }
-  }
-
-  async function handleSetReview(deckId: string) {
-    setDecksLoading(true);
-    try {
-      const res = await setDeckReviewAction(deckId);
-      if (!res.ok) setDecksError(res.error ?? "Failed to set review");
-    } finally {
-      const status = getDeckStatusFromFilters();
-      const r = await listDecksAction({ perPage: 50, page: 1, status });
-      if (r.ok) {
-        setDecksList(
-          r.data.decks.map((d: any) => ({
-            id: d.id,
-            name: d.name,
-            description: d.description,
-            creatorName: d.creator?.full_name ?? d.creator?.email ?? "Unknown",
-            creatorEmail: d.creator?.email ?? "",
-            flashcards_count: d.flashcards_count ?? 0,
-            statusLabel: d.is_archived
-              ? "Blocked"
-              : d.is_public
-              ? "Published"
-              : "Under Review",
-            is_public: Boolean(d.is_public),
-            is_archived: Boolean(d.is_archived),
-            study_count: d.study_count ?? 0,
-            created_at: d.created_at,
-            updated_at: d.updated_at,
-            reported: Boolean(d.reported),
-            raw: d,
-          }))
-        );
-      }
-      setDecksLoading(false);
-    }
-  }
-
-  async function handleBlock(deckId: string) {
-    setDecksLoading(true);
-    try {
-      const res = await blockDeckAction(deckId);
-      if (!res.ok) setDecksError(res.error ?? "Failed to block");
-    } finally {
-      const status = getDeckStatusFromFilters();
-      const r = await listDecksAction({ perPage: 50, page: 1, status });
-      if (r.ok) {
-        setDecksList(
-          r.data.decks.map((d: any) => ({
-            id: d.id,
-            name: d.name,
-            description: d.description,
-            creatorName: d.creator?.full_name ?? d.creator?.email ?? "Unknown",
-            creatorEmail: d.creator?.email ?? "",
-            flashcards_count: d.flashcards_count ?? 0,
-            statusLabel: d.is_archived
-              ? "Blocked"
-              : d.is_public
-              ? "Published"
-              : "Under Review",
-            is_public: Boolean(d.is_public),
-            is_archived: Boolean(d.is_archived),
-            study_count: d.study_count ?? 0,
-            created_at: d.created_at,
-            updated_at: d.updated_at,
-            reported: Boolean(d.reported),
-            raw: d,
-          }))
-        );
-      }
-      setDecksLoading(false);
-    }
-  }
-
-  async function handleUnblock(deckId: string) {
-    setDecksLoading(true);
-    try {
-      const res = await unblockDeckAction(deckId);
-      if (!res.ok) setDecksError(res.error ?? "Failed to unblock");
-    } finally {
-      const status = getDeckStatusFromFilters();
-      const r = await listDecksAction({ perPage: 50, page: 1, status });
-      if (r.ok) {
-        setDecksList(
-          r.data.decks.map((d: any) => ({
-            id: d.id,
-            name: d.name,
-            description: d.description,
-            creatorName: d.creator?.full_name ?? d.creator?.email ?? "Unknown",
-            creatorEmail: d.creator?.email ?? "",
-            flashcards_count: d.flashcards_count ?? 0,
-            statusLabel: d.is_archived
-              ? "Blocked"
-              : d.is_public
-              ? "Published"
-              : "Under Review",
-            is_public: Boolean(d.is_public),
-            is_archived: Boolean(d.is_archived),
-            study_count: d.study_count ?? 0,
-            created_at: d.created_at,
-            updated_at: d.updated_at,
-            reported: Boolean(d.reported),
-            raw: d,
-          }))
-        );
-      }
-      setDecksLoading(false);
-    }
-  }
-
   async function handleDeleteDeck(deckId: string) {
     setDecksLoading(true);
     try {
@@ -559,43 +392,6 @@ export default function AdminDashboardPage() {
       else setProfileDetails({ error: res.error });
     } catch {
       setProfileDetails({ error: "Failed to load profile" });
-    }
-  }
-
-  function onOpenEdit(id: string) {
-    const u = users.find((x) => x.id === id);
-    setEditState({
-      id,
-      email: u?.email ?? "",
-      full_name: u?.name ?? "",
-      avatar_url: u?.avatar ?? "",
-      status: u?.status ?? "Active",
-    });
-    setEditOpen(true);
-  }
-
-  async function saveEdit(e?: React.FormEvent) {
-    e?.preventDefault?.();
-    setSavingEdit(true);
-    try {
-      const { id, email, full_name, avatar_url, status } = editState;
-      const res = await updateUserAction({
-        id,
-        email,
-        full_name,
-        avatar_url,
-        status,
-      });
-      if (!res.ok) {
-        setError(res.error ?? "Failed to save user");
-      } else {
-        await refreshList();
-        setEditOpen(false);
-      }
-    } catch (err: any) {
-      setError(err?.message ?? "Failed to save user");
-    } finally {
-      setSavingEdit(false);
     }
   }
 
@@ -1258,6 +1054,48 @@ export default function AdminDashboardPage() {
           </TabsContent>
         </Tabs>
       </div>
+
+      <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {confirmAction?.type === "delete"
+                ? "Delete user?"
+                : "Suspend user?"}
+            </DialogTitle>
+            <DialogDescription>
+              {confirmAction?.type === "delete"
+                ? "This will permanently remove the user’s auth record. This cannot be undone."
+                : "This will prevent the user from signing in until re-enabled."}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="mt-4 flex justify-end gap-2">
+            <Button
+              variant="ghost"
+              onClick={() => setConfirmOpen(false)}
+              disabled={confirmLoading}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant={
+                confirmAction?.type === "delete" ? "destructive" : "default"
+              }
+              onClick={executeConfirm}
+              disabled={confirmLoading}
+            >
+              {confirmLoading
+                ? confirmAction?.type === "delete"
+                  ? "Deleting..."
+                  : "Applying..."
+                : confirmAction?.type === "delete"
+                ? "Delete"
+                : "Suspend"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </DashboardShell>
   );
 }
